@@ -7,8 +7,19 @@ export default function CheckoutPage({
   activeCoupon,
   onClearCart,
   onPlaceOrder,
-  onNavigate
+  onNavigate,
+  deliverySettings
 }) {
+  const tnDistrictsList = [
+    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", 
+    "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", 
+    "Kanyakumari", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", 
+    "Nagapattinam", "Namakkal", "Nilgiris", "Perambalur", "Pudukkottai", 
+    "Ramanathapuram", "Ranipet", "Salem", "Sivaganga", "Tenkasi", 
+    "Thanjavur", "Theni", "Thoothukudi", "Tiruchirappalli", "Tirunelveli", 
+    "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", 
+    "Vellore", "Viluppuram", "Virudhunagar"
+  ];
   // Helper keys
   const getItemKey = (item) => `${item.id}-${item.selectedSize || 'Free Size'}-${item.selectedColor || ''}`;
   const itemsMatch = (itemA, itemB) => {
@@ -104,9 +115,25 @@ export default function CheckoutPage({
     discount = subtotal * 0.1;
   }
 
-  // Shipping (Free above 1499, else 150)
-  const shippingThreshold = 1499;
-  const shippingCost = subtotal >= shippingThreshold || subtotal === 0 ? 0 : 150;
+  // Shipping calculation based on dynamic delivery settings and customer location
+  const shippingThreshold = deliverySettings ? (deliverySettings.freeShippingThreshold || 1499) : 1499;
+  
+  const shippingCost = useMemo(() => {
+    if (subtotal >= shippingThreshold || subtotal === 0) return 0;
+    
+    // Check if destination is Tamil Nadu
+    const isTN = stateVal.trim().toLowerCase() === 'tamil nadu' || stateVal.trim().toLowerCase() === 'tamilnadu';
+    if (isTN) {
+      const selectedDistrict = city.trim().toLowerCase();
+      if (deliverySettings && deliverySettings.charges && deliverySettings.charges[selectedDistrict] !== undefined) {
+        return Number(deliverySettings.charges[selectedDistrict]);
+      }
+      return 90; // Fallback district shipping fee
+    }
+    
+    return deliverySettings ? (deliverySettings.defaultCharge || 150) : 150;
+  }, [subtotal, stateVal, city, deliverySettings, shippingThreshold]);
+
   const total = subtotal - discount + shippingCost;
 
   // Handle place order submit
@@ -419,26 +446,45 @@ export default function CheckoutPage({
             
             <div className="checkout-form-row grid-3-col">
               <div className="form-field">
-                <label>City</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="Mumbai" 
-                  value={city} 
-                  onChange={(e) => setCity(e.target.value)}
-                  required 
-                />
-              </div>
-              <div className="form-field">
                 <label>State</label>
                 <input 
                   type="text" 
                   className="form-input" 
-                  placeholder="Maharashtra" 
+                  placeholder="e.g. Tamil Nadu or Maharashtra" 
                   value={stateVal} 
-                  onChange={(e) => setStateVal(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStateVal(val);
+                    if (val.trim().toLowerCase() === 'tamil nadu' || val.trim().toLowerCase() === 'tamilnadu') {
+                      setCity(prev => tnDistrictsList.map(d => d.toLowerCase()).includes(prev.toLowerCase()) ? prev : 'Chennai');
+                    }
+                  }}
                   required 
                 />
+              </div>
+              <div className="form-field">
+                <label>City / District</label>
+                {(stateVal.trim().toLowerCase() === 'tamil nadu' || stateVal.trim().toLowerCase() === 'tamilnadu') ? (
+                  <select
+                    className="form-input"
+                    value={tnDistrictsList.map(d => d.toLowerCase()).includes(city.toLowerCase()) ? city : 'Chennai'}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                  >
+                    {tnDistrictsList.map(dist => (
+                      <option key={dist.toLowerCase()} value={dist}>{dist}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Mumbai" 
+                    value={city} 
+                    onChange={(e) => setCity(e.target.value)}
+                    required 
+                  />
+                )}
               </div>
               <div className="form-field">
                 <label>PIN Code</label>

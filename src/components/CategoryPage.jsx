@@ -9,7 +9,8 @@ export default function CategoryPage({
   onWishlistToggle,
   onAddToCart,
   onQuickView,
-  onNavigate
+  onNavigate,
+  categories
 }) {
   // Category configurations
   const categoryConfigs = {
@@ -45,11 +46,23 @@ export default function CategoryPage({
     }
   };
 
-  const currentConfig = categoryConfigs[categoryName] || {
+  const matchedDbCategory = categories?.find(cat => cat.id === categoryName);
+  
+  const isAllProducts = !categoryName || categoryName === 'all';
+
+  const currentConfig = isAllProducts ? {
+    title: "All Collections",
+    description: "Browse our complete catalog of premium fashion — from luxurious sarees and kurtis to elegant maxi dresses, nightwear, hijabs, and accessories.",
+    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
+  } : matchedDbCategory ? {
+    title: matchedDbCategory.name,
+    description: matchedDbCategory.description || "Explore our premium fashion silhouettes designed to celebrate your unique identity.",
+    image: matchedDbCategory.image || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
+  } : (categoryConfigs[categoryName] || {
     title: "Shop All Collections",
     description: "Explore our premium fashion silhouettes designed to celebrate your unique identity.",
     image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
-  };
+  });
 
   // Filter States
   const [searchVal, setSearchVal] = useState('');
@@ -75,7 +88,10 @@ export default function CategoryPage({
 
   // Filter & Sort Logic
   const filteredProducts = useMemo(() => {
-    let list = products.filter(p => p.category === categoryName);
+    // If no category selected (All Products view), skip category filter
+    let list = isAllProducts
+      ? [...products]
+      : products.filter(p => p.category === categoryName);
 
     // Search query inside category page
     if (searchVal.trim()) {
@@ -121,7 +137,7 @@ export default function CategoryPage({
     }
 
     return list;
-  }, [products, categoryName, searchVal, maxPrice, filterNew, filterBest, filterFeatured, filterDiscounted, filterInStock, sortBy]);
+  }, [products, categoryName, isAllProducts, searchVal, maxPrice, filterNew, filterBest, filterFeatured, filterDiscounted, filterInStock, sortBy]);
 
   // Paginated Products
   const paginatedProducts = useMemo(() => {
@@ -147,7 +163,7 @@ export default function CategoryPage({
     setSortBy('featured');
   };
 
-  const categoriesList = [
+  const categoriesList = categories && categories.length > 0 ? categories : [
     { id: 'sarees', name: 'Sarees' },
     { id: 'kurtis', name: 'Kurtis' },
     { id: 'maxi', name: 'Maxi Dresses' },
@@ -173,6 +189,13 @@ export default function CategoryPage({
       <div className="category-nav-bar-wrapper">
         <div className="container">
           <div className="category-nav-scroll-container">
+            {/* All Products button */}
+            <button
+              className={`category-nav-item ${isAllProducts ? 'active' : ''}`}
+              onClick={() => onNavigate('shop', 'all')}
+            >
+              All Products
+            </button>
             {categoriesList.map(cat => (
               <button
                 key={cat.id}
@@ -242,6 +265,14 @@ export default function CategoryPage({
             <div className="sidebar-widget">
               <h3 className="widget-title">Shop Collections</h3>
               <div className="widget-categories-list">
+                {/* All Products link */}
+                <button 
+                  className={`widget-cat-link ${isAllProducts ? 'active' : ''}`}
+                  onClick={() => onNavigate('shop', 'all')}
+                >
+                  <span>All Products</span>
+                  <ChevronRight size={14} />
+                </button>
                 {categoriesList.map(cat => (
                   <button 
                     key={cat.id}
@@ -425,6 +456,16 @@ export default function CategoryPage({
               <div className="drawer-section">
                 <h4>Collections</h4>
                 <div className="drawer-cat-buttons">
+                  {/* All Products button in mobile drawer */}
+                  <button 
+                    className={`drawer-cat-btn ${isAllProducts ? 'active' : ''}`}
+                    onClick={() => {
+                      onNavigate('shop', 'all');
+                      setIsFilterDrawerOpen(false);
+                    }}
+                  >
+                    All Products
+                  </button>
                   {categoriesList.map(cat => (
                     <button 
                       key={cat.id}

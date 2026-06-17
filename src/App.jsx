@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { subscribeToAuthState } from './services/firebaseServices';
 import { products as initialProducts } from './data/products';
 import { HelpCircle, Star, Phone, MessageSquare, ShieldCheck, Truck, RefreshCw, User } from 'lucide-react';
@@ -67,7 +67,8 @@ function CategoryPageWrapper({
   onWishlistToggle,
   onAddToCart,
   onQuickView,
-  onNavigate
+  onNavigate,
+  categories
 }) {
   const { categoryName } = useParams();
   const mappedCategory = categoryName === 'nightwears' ? 'nightwear' : categoryName;
@@ -80,6 +81,7 @@ function CategoryPageWrapper({
       onAddToCart={onAddToCart}
       onQuickView={onQuickView}
       onNavigate={onNavigate}
+      categories={categories}
     />
   );
 }
@@ -116,12 +118,13 @@ function HomeView({
   handleWishlistToggle,
   handleCardAddToCart,
   setActiveQuickViewProduct,
-  handleNavigate
+  handleNavigate,
+  categories
 }) {
   return (
     <div className="page-home animate-fade">
       <Hero onNavigate={handleNavigate} />
-      <CategorySection onNavigate={handleNavigate} />
+      <CategorySection onNavigate={handleNavigate} categories={categories} />
       <PromoBanner onNavigate={handleNavigate} />
       
       {/* Featured Grid Section */}
@@ -470,6 +473,113 @@ export default function App() {
 
   // Global E-commerce States
   const [products, setProducts] = useState(initialProducts);
+  const [categories, setCategories] = useState([]);
+  const [deliverySettings, setDeliverySettings] = useState(null);
+
+  // Fetch delivery settings from Firestore and auto-seed defaults if missing
+  useEffect(() => {
+    const deliveryDocRef = doc(db, 'settings', 'delivery');
+    const unsubscribe = onSnapshot(deliveryDocRef, async (docSnap) => {
+      if (!docSnap.exists()) {
+        console.log("Firestore delivery settings missing. Seeding defaults from App.jsx...");
+        const defaultDeliverySettings = {
+          defaultCharge: 150,
+          freeShippingThreshold: 1499,
+          charges: {
+            "chennai": 60,
+            "coimbatore": 90,
+            "madurai": 90,
+            "tiruchirappalli": 90,
+            "salem": 90,
+            "tiruppur": 90,
+            "erode": 90,
+            "vellore": 90,
+            "thanjavur": 90,
+            "dindigul": 90,
+            "ranipet": 90,
+            "tirupathur": 90,
+            "kanchipuram": 90,
+            "chengalpattu": 90,
+            "tiruvallur": 90,
+            "tiruvannamalai": 90,
+            "viluppuram": 90,
+            "kallakurichi": 90,
+            "cuddalore": 90,
+            "dharmapuri": 90,
+            "krishnagiri": 90,
+            "namakkal": 90,
+            "nilgiris": 100,
+            "karur": 90,
+            "perambalur": 90,
+            "ariyalur": 90,
+            "nagapattinam": 90,
+            "mayiladuthurai": 90,
+            "tiruvarur": 90,
+            "pudukkottai": 90,
+            "sivaganga": 90,
+            "ramanathapuram": 90,
+            "virudhunagar": 90,
+            "theni": 90,
+            "tenkasi": 90,
+            "tirunelveli": 90,
+            "thoothukudi": 90,
+            "kanyakumari": 100
+          }
+        };
+        try {
+          await setDoc(deliveryDocRef, defaultDeliverySettings);
+          console.log("Delivery settings seeded successfully!");
+          setDeliverySettings(defaultDeliverySettings);
+        } catch (e) {
+          console.error("Failed to seed delivery settings:", e);
+        }
+      } else {
+        setDeliverySettings(docSnap.data());
+      }
+    }, (err) => {
+      console.error("Error listening to delivery settings:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch categories from Firestore with real-time sync and auto-seed if empty
+  useEffect(() => {
+    const categoriesQuery = collection(db, 'categories');
+    const unsubscribe = onSnapshot(categoriesQuery, async (querySnapshot) => {
+      const catsList = [];
+      querySnapshot.forEach((doc) => {
+        catsList.push({ id: doc.id, ...doc.data() });
+      });
+      
+      if (catsList.length === 0) {
+        console.log("Firestore categories collection is empty. Seeding defaults from App.jsx...");
+        const defaultCategories = [
+          { id: 'sarees', name: 'Sarees', description: 'Elegant drapes & silk fabrics', offer: 'Flat 10% OFF', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' },
+          { id: 'kurtis', name: 'Kurtis', description: 'Ethnic and modern wear fusion', offer: 'New Season', image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=600&q=80' },
+          { id: 'maxi', name: 'Maxi Dresses', description: 'Flowing silhouettes for dinners', offer: 'Up to 30% OFF', image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=600&q=80' },
+          { id: 'nightwear', name: 'Night Wears', description: 'Unwind in pure satin and cotton', offer: 'Buy 2 Get 1', image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80' },
+          { id: 'hijabs', name: 'Hijabs', description: 'Breathable premium wraps', offer: 'Starting ₹399', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80' },
+          { id: 'accessories', name: 'Accessories', description: 'Luxury handbags & pendant sets', offer: 'Rose Gold Plated', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80' }
+        ];
+        
+        try {
+          for (const cat of defaultCategories) {
+            await setDoc(doc(db, 'categories', cat.id), cat);
+          }
+          console.log("Categories seeded successfully.");
+        } catch (e) {
+          console.error("Failed to seed default categories:", e);
+        }
+      } else {
+        // Sort categories to maintain consistent display order
+        catsList.sort((a, b) => a.id.localeCompare(b.id));
+        setCategories(catsList);
+      }
+    }, (err) => {
+      console.error("Error listening to categories in App.jsx:", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Sync products list with Firestore and auto-seed if empty
   useEffect(() => {
@@ -659,8 +769,8 @@ export default function App() {
       const { address, city, state, pinCode } = orderDetails.shipping;
       shippingAddressStr = `${address}, ${city}, ${state} - ${pinCode}`;
     } else if (orderDetails.shippingInfo) {
-      const { address, city, postalCode } = orderDetails.shippingInfo;
-      shippingAddressStr = `${address}, ${city} - ${postalCode}`;
+      const { address, city, state, postalCode } = orderDetails.shippingInfo;
+      shippingAddressStr = `${address}, ${city}, ${state || ''} - ${postalCode}`;
     }
 
     const customerNameVal = orderDetails.customer?.name || orderDetails.shippingInfo?.fullName || 'Guest';
@@ -774,6 +884,8 @@ export default function App() {
 
 
 
+  const isAdminRoute = location.pathname.toLowerCase().startsWith('/admin');
+
   return (
     <div className="riza-fashions-app">
       {isLoading && (
@@ -786,17 +898,20 @@ export default function App() {
       )}
       
       {/* Dynamic Header navbar */}
-      <Navbar
-        cartCount={cartCount}
-        wishlistCount={wishlistCount}
-        onNavigate={handleNavigate}
-        currentPage={currentPage}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenAccount={() => setIsAccountOpen(true)}
-        currentUser={currentUser}
-      />
+      {!isAdminRoute && (
+        <Navbar
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onNavigate={handleNavigate}
+          currentPage={currentPage}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenAccount={() => setIsAccountOpen(true)}
+          currentUser={currentUser}
+          categories={categories}
+        />
+      )}
 
       {/* Main page content sections */}
       <main className="main-viewport-content">
@@ -809,6 +924,7 @@ export default function App() {
               handleCardAddToCart={handleCardAddToCart}
               setActiveQuickViewProduct={setActiveQuickViewProduct}
               handleNavigate={handleNavigate}
+              categories={categories}
             />
           } />
           
@@ -820,6 +936,7 @@ export default function App() {
               onAddToCart={handleCardAddToCart}
               onQuickView={setActiveQuickViewProduct}
               onNavigate={handleNavigate}
+              categories={categories}
             />
           } />
           
@@ -831,6 +948,7 @@ export default function App() {
               onAddToCart={handleCardAddToCart}
               onQuickView={setActiveQuickViewProduct}
               onNavigate={handleNavigate}
+              categories={categories}
             />
           } />
           
@@ -868,6 +986,7 @@ export default function App() {
                 onClearCart={handleClearCart}
                 onPlaceOrder={handlePlaceOrder}
                 onNavigate={handleNavigate}
+                deliverySettings={deliverySettings}
               />
             </ProtectedRoute>
           } />
@@ -931,7 +1050,7 @@ export default function App() {
             !isLoading && (!currentUser || !currentUser.isAdmin) ? (
               <Navigate to="/" replace />
             ) : (
-              <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} />
+              <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} categories={categories} deliverySettings={deliverySettings} />
             )
           } />
 
@@ -947,18 +1066,20 @@ export default function App() {
       </main>
 
       {/* Global Sticky Footer */}
-      <Footer onNavigate={handleNavigate} />
+      {!isAdminRoute && <Footer onNavigate={handleNavigate} />}
 
       {/* Mobile Sticky Action Nav */}
-      <MobileNav
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
-        cartCount={cartCount}
-        wishlistCount={wishlistCount}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenAccount={() => setIsAccountOpen(true)}
-        currentUser={currentUser}
-      />
+      {!isAdminRoute && (
+        <MobileNav
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenAccount={() => setIsAccountOpen(true)}
+          currentUser={currentUser}
+        />
+      )}
 
       {/* Cart Slider Drawer */}
       <CartDrawer
@@ -993,6 +1114,7 @@ export default function App() {
         onPlaceOrder={handlePlaceOrder}
         onNavigate={handleNavigate}
         currentUser={currentUser}
+        deliverySettings={deliverySettings}
       />
 
       {/* Quick View Details Modal */}

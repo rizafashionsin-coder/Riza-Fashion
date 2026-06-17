@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 
-export default function CategorySection({ onNavigate }) {
-  const categories = [
+export default function CategorySection({ onNavigate, categories }) {
+  const displayCategories = categories && categories.length > 0 ? categories : [
     {
       id: 'sarees',
       name: 'Sarees',
@@ -59,9 +59,9 @@ export default function CategorySection({ onNavigate }) {
         </div>
 
         <div className="categories-grid">
-          {categories.map((category, idx) => (
+          {displayCategories.map((category, idx) => (
             <div 
-              key={idx} 
+              key={category.id || idx} 
               className="category-card"
               onClick={() => onNavigate('shop', category.id)}
             >

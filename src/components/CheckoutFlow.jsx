@@ -9,9 +9,21 @@ export default function CheckoutFlow({
   activeCoupon,
   onClearCart,
   onPlaceOrder,
-  onNavigate
+  onNavigate,
+  deliverySettings
 }) {
   if (!isOpen) return null;
+
+  const tnDistrictsList = [
+    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", 
+    "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", 
+    "Kanyakumari", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", 
+    "Nagapattinam", "Namakkal", "Nilgiris", "Perambalur", "Pudukkottai", 
+    "Ramanathapuram", "Ranipet", "Salem", "Sivaganga", "Tenkasi", 
+    "Thanjavur", "Theni", "Thoothukudi", "Tiruchirappalli", "Tirunelveli", 
+    "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", 
+    "Vellore", "Viluppuram", "Virudhunagar"
+  ];
 
   const [step, setStep] = useState(1); // Steps: 1 = Shipping, 2 = Payment, 3 = Confirmation
   
@@ -22,6 +34,7 @@ export default function CheckoutFlow({
     phone: '',
     address: '',
     city: '',
+    state: '',
     postalCode: ''
   });
 
@@ -41,7 +54,28 @@ export default function CheckoutFlow({
   }
 
   const discountAmount = Math.round((subtotal * discountPercentage) / 100);
-  const shippingFee = subtotal - discountAmount >= 1499 ? 0 : 99;
+  
+  const shippingThreshold = deliverySettings ? (deliverySettings.freeShippingThreshold || 1499) : 1499;
+
+  const shippingFee = (() => {
+    const totalBeforeShipping = subtotal - discountAmount;
+    if (totalBeforeShipping >= shippingThreshold || totalBeforeShipping === 0) return 0;
+
+    const stateVal = shippingForm.state || '';
+    const cityVal = shippingForm.city || '';
+
+    const isTN = stateVal.trim().toLowerCase() === 'tamil nadu' || stateVal.trim().toLowerCase() === 'tamilnadu';
+    if (isTN) {
+      const selectedDistrict = cityVal.trim().toLowerCase();
+      if (deliverySettings && deliverySettings.charges && deliverySettings.charges[selectedDistrict] !== undefined) {
+        return Number(deliverySettings.charges[selectedDistrict]);
+      }
+      return 90; // Fallback district shipping fee
+    }
+
+    return deliverySettings ? (deliverySettings.defaultCharge || 150) : 150;
+  })();
+
   const grandTotal = subtotal - discountAmount + shippingFee;
 
   const handleShippingChange = (e) => {
@@ -256,18 +290,53 @@ export default function CheckoutFlow({
                   </div>
                 </div>
 
-                <div className="form-group-row grid-2-col">
+                <div className="form-group-row grid-3-col">
                   <div className="form-field">
-                    <label>City / Town</label>
+                    <label>State</label>
                     <input
                       type="text"
-                      name="city"
+                      name="state"
                       className="form-input"
-                      placeholder="Mumbai"
-                      value={shippingForm.city}
-                      onChange={handleShippingChange}
+                      placeholder="e.g. Tamil Nadu"
+                      value={shippingForm.state}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setShippingForm(prev => {
+                          const updated = { ...prev, state: val };
+                          if (val.trim().toLowerCase() === 'tamil nadu' || val.trim().toLowerCase() === 'tamilnadu') {
+                            updated.city = tnDistrictsList.map(d => d.toLowerCase()).includes(prev.city.toLowerCase()) ? prev.city : 'Chennai';
+                          }
+                          return updated;
+                        });
+                      }}
                       required
                     />
+                  </div>
+                  <div className="form-field">
+                    <label>City / District</label>
+                    {(shippingForm.state && (shippingForm.state.trim().toLowerCase() === 'tamil nadu' || shippingForm.state.trim().toLowerCase() === 'tamilnadu')) ? (
+                      <select
+                        name="city"
+                        className="form-input"
+                        value={tnDistrictsList.map(d => d.toLowerCase()).includes(shippingForm.city.toLowerCase()) ? shippingForm.city : 'Chennai'}
+                        onChange={handleShippingChange}
+                        required
+                      >
+                        {tnDistrictsList.map(dist => (
+                          <option key={dist.toLowerCase()} value={dist}>{dist}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        name="city"
+                        className="form-input"
+                        placeholder="Mumbai"
+                        value={shippingForm.city}
+                        onChange={handleShippingChange}
+                        required
+                      />
+                    )}
                   </div>
                   <div className="form-field">
                     <label>Pincode / Postal Code</label>
@@ -322,7 +391,7 @@ export default function CheckoutFlow({
                   )}
                   <div className="sidebar-pricing-row">
                     <span>Shipping Fee</span>
-                    <span>{subtotal - discountAmount >= 1499 ? 'FREE' : '₹99'}</span>
+                    <span>{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
                   </div>
                   <hr className="summary-divider" />
                   <div className="sidebar-pricing-row total-row">
@@ -393,7 +462,7 @@ export default function CheckoutFlow({
                   <div className="billing-details-preview">
                     <strong>{shippingForm.fullName}</strong>
                     <p>{shippingForm.address}</p>
-                    <p>{shippingForm.city} - {shippingForm.postalCode}</p>
+                    <p>{shippingForm.city}, {shippingForm.state || ''} - {shippingForm.postalCode}</p>
                     <p>Phone: {shippingForm.phone}</p>
                   </div>
                   
