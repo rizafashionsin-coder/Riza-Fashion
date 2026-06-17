@@ -20,7 +20,8 @@ import {
   ExternalLink,
   Layers,
   Settings,
-  User
+  User,
+  Tag
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { 
@@ -33,7 +34,8 @@ import {
   updateDoc,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -162,6 +164,22 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [catOffer, setCatOffer] = useState('');
   const [catImage, setCatImage] = useState('');
 
+  // Coupon modal & form states
+  const [coupons, setCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
+  const [cpCode, setCpCode] = useState('');
+  const [cpType, setCpType] = useState('percentage'); // percentage | fixed
+  const [cpValue, setCpValue] = useState('');
+  const [cpMinOrderAmount, setCpMinOrderAmount] = useState('');
+  const [cpMaxDiscount, setCpMaxDiscount] = useState('');
+  const [cpExpiryDate, setCpExpiryDate] = useState('');
+  const [cpTotalLimit, setCpTotalLimit] = useState('');
+  const [cpPerUserLimit, setCpPerUserLimit] = useState('');
+  const [cpActive, setCpActive] = useState(true);
+  const [couponSearch, setCouponSearch] = useState('');
+
   // Form states for Add/Edit product
   const [prodName, setProdName] = useState('');
   const [prodCategory, setProdCategory] = useState('sarees');
@@ -249,13 +267,30 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
         setLoadingOrders(false);
       });
 
-      return () => unsubscribe();
+      setLoadingCoupons(true);
+      const couponsQuery = query(collection(db, 'coupons'), orderBy('createdAt', 'desc'));
+      const unsubscribeCoupons = onSnapshot(couponsQuery, (querySnapshot) => {
+        const cpList = [];
+        querySnapshot.forEach((doc) => {
+          cpList.push({ id: doc.id, ...doc.data() });
+        });
+        setCoupons(cpList);
+        setLoadingCoupons(false);
+      }, (err) => {
+        console.error("Error listening to coupons in admin dashboard:", err);
+        setLoadingCoupons(false);
+      });
+
+      return () => {
+        unsubscribe();
+        unsubscribeCoupons();
+      };
     }
   }, [isAdmin]);
 
   // Lock body scroll when modal is open to satisfy UI accessibility requirements
   useEffect(() => {
-    if (isProductModalOpen || isCategoryModalOpen) {
+    if (isProductModalOpen || isCategoryModalOpen || isCouponModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -263,7 +298,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isProductModalOpen, isCategoryModalOpen]);
+  }, [isProductModalOpen, isCategoryModalOpen, isCouponModalOpen]);
 
   // Category management handlers
   const handleOpenAddCategoryModal = () => {
@@ -352,6 +387,124 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     } catch (err) {
       console.error("Firestore category delete failed:", err);
       alert("Failed to delete category. Check permissions.");
+    }
+  };
+
+  // Coupon management handlers
+  const handleOpenAddCouponModal = () => {
+    setEditingCoupon(null);
+    setCpCode('');
+    setCpType('percentage');
+    setCpValue('');
+    setCpMinOrderAmount('');
+    setCpMaxDiscount('');
+    setCpExpiryDate('');
+    setCpTotalLimit('');
+    setCpPerUserLimit('');
+    setCpActive(true);
+    setFormError('');
+    setFormSuccess('');
+    setIsCouponModalOpen(true);
+  };
+
+  const handleOpenEditCouponModal = (coupon) => {
+    setEditingCoupon(coupon);
+    setCpCode(coupon.code || '');
+    setCpType(coupon.type || 'percentage');
+    setCpValue(coupon.value || '');
+    setCpMinOrderAmount(coupon.minOrderAmount || '');
+    setCpMaxDiscount(coupon.maxDiscount || '');
+    setCpExpiryDate(coupon.expiryDate ? coupon.expiryDate.substring(0, 16) : '');
+    setCpTotalLimit(coupon.totalLimit || '');
+    setCpPerUserLimit(coupon.perUserLimit || '');
+    setCpActive(coupon.active !== false);
+    setFormError('');
+    setFormSuccess('');
+    setIsCouponModalOpen(true);
+  };
+
+  const handleCouponSubmit = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    setFormSuccess('');
+
+    if (!cpCode.trim()) {
+      setFormError("Coupon Code is required.");
+      return;
+    }
+    if (!cpValue || isNaN(cpValue) || Number(cpValue) <= 0) {
+      setFormError("Please enter a valid positive discount value.");
+      return;
+    }
+    if (cpMinOrderAmount && (isNaN(cpMinOrderAmount) || Number(cpMinOrderAmount) < 0)) {
+      setFormError("Minimum order amount must be a positive number.");
+      return;
+    }
+    if (cpMaxDiscount && (isNaN(cpMaxDiscount) || Number(cpMaxDiscount) < 0)) {
+      setFormError("Maximum discount amount must be a positive number.");
+      return;
+    }
+    if (cpTotalLimit && (isNaN(cpTotalLimit) || Number(cpTotalLimit) < 0)) {
+      setFormError("Total limit must be a positive number.");
+      return;
+    }
+    if (cpPerUserLimit && (isNaN(cpPerUserLimit) || Number(cpPerUserLimit) < 0)) {
+      setFormError("Per user limit must be a positive number.");
+      return;
+    }
+
+    const cleanedCode = cpCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    if (!cleanedCode) {
+      setFormError("Invalid coupon code. Use letters and numbers only.");
+      return;
+    }
+
+    const couponPayload = {
+      code: cleanedCode,
+      type: cpType,
+      value: Number(cpValue),
+      minOrderAmount: cpMinOrderAmount ? Number(cpMinOrderAmount) : 0,
+      maxDiscount: cpMaxDiscount ? Number(cpMaxDiscount) : 0,
+      expiryDate: cpExpiryDate ? new Date(cpExpiryDate).toISOString() : '',
+      totalLimit: cpTotalLimit ? Number(cpTotalLimit) : 0,
+      perUserLimit: cpPerUserLimit ? Number(cpPerUserLimit) : 0,
+      active: cpActive,
+      usedCount: editingCoupon ? (editingCoupon.usedCount || 0) : 0,
+      createdAt: editingCoupon ? (editingCoupon.createdAt || serverTimestamp()) : serverTimestamp()
+    };
+
+    try {
+      if (editingCoupon) {
+        if (editingCoupon.code !== cleanedCode) {
+          await deleteDoc(doc(db, 'coupons', editingCoupon.code));
+        }
+        await setDoc(doc(db, 'coupons', cleanedCode), couponPayload);
+        setFormSuccess("Coupon updated successfully!");
+      } else {
+        await setDoc(doc(db, 'coupons', cleanedCode), couponPayload);
+        setFormSuccess("Coupon created successfully!");
+      }
+
+      setTimeout(() => {
+        setIsCouponModalOpen(false);
+        setEditingCoupon(null);
+      }, 1000);
+    } catch (err) {
+      console.error("Firestore coupon write failed:", err);
+      setFormError("Failed to save coupon. Please check database permissions.");
+    }
+  };
+
+  const handleDeleteCoupon = async (couponCode) => {
+    if (!window.confirm(`Are you sure you want to delete coupon ${couponCode}? This action cannot be undone.`)) return;
+
+    try {
+      await deleteDoc(doc(db, 'coupons', couponCode));
+      console.log("Coupon deleted from Firestore:", couponCode);
+    } catch (err) {
+      console.error("Firestore coupon delete failed:", err);
+      alert("Failed to delete coupon. Check database permissions.");
     }
   };
 
@@ -837,6 +990,21 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
           </button>
 
           <button 
+            onClick={() => { setActiveTab('coupons'); setIsMobileSidebarOpen(false); }}
+            className={`sidebar-link ${activeTab === 'coupons' ? 'active' : ''}`}
+          >
+            <span className="sidebar-link-content">
+              <Tag size={18} />
+              <span>Coupons</span>
+            </span>
+            {coupons.length > 0 && (
+              <span style={{ fontSize: '0.75rem', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>
+                {coupons.length}
+              </span>
+            )}
+          </button>
+
+          <button 
             onClick={() => { setActiveTab('settings'); setIsMobileSidebarOpen(false); }}
             className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`}
           >
@@ -1175,6 +1343,161 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: Coupons Pane */}
+        {activeTab === 'coupons' && (
+          <div className="admin-coupons-pane animate-fade" style={{ padding: '20px' }}>
+            
+            {/* Header row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.8rem', margin: 0, color: 'var(--charcoal)' }}>Coupon Code Management</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>Create, edit, toggle, and view usage statistics for discount coupons.</p>
+              </div>
+              <button 
+                className="btn btn-primary"
+                onClick={handleOpenAddCouponModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Plus size={16} />
+                Add New Coupon
+              </button>
+            </div>
+
+            {/* Analytics Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Total Coupons</span>
+                <strong style={{ fontSize: '1.8rem', color: 'var(--charcoal)' }}>{coupons.length}</strong>
+              </div>
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Active Coupons</span>
+                <strong style={{ fontSize: '1.8rem', color: '#2E7D32' }}>{coupons.filter(c => c.active).length}</strong>
+              </div>
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Expired Coupons</span>
+                <strong style={{ fontSize: '1.8rem', color: '#B71C1C' }}>{coupons.filter(c => c.expiryDate && new Date(c.expiryDate) < new Date()).length}</strong>
+              </div>
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Most Used Coupon</span>
+                <strong style={{ fontSize: '1.2rem', color: 'var(--primary-dark)', display: 'block', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {(() => {
+                    let mostUsed = 'N/A';
+                    let maxUsed = 0;
+                    coupons.forEach(c => {
+                      if ((c.usedCount || 0) > maxUsed) {
+                        maxUsed = c.usedCount;
+                        mostUsed = `${c.code} (${c.usedCount} uses)`;
+                      }
+                    });
+                    return mostUsed;
+                  })()}
+                </strong>
+              </div>
+            </div>
+
+            {/* List and Search Card */}
+            <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+              
+              {/* Search bar */}
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Search coupons by code..." 
+                  value={couponSearch}
+                  onChange={(e) => setCouponSearch(e.target.value)}
+                  style={{ maxWidth: '360px', width: '100%' }}
+                />
+              </div>
+
+              {/* Table wrapper */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <th style={{ padding: '12px 16px' }}>Code</th>
+                      <th style={{ padding: '12px 16px' }}>Discount</th>
+                      <th style={{ padding: '12px 16px' }}>Min Order</th>
+                      <th style={{ padding: '12px 16px' }}>Max Discount</th>
+                      <th style={{ padding: '12px 16px' }}>Expiry Date</th>
+                      <th style={{ padding: '12px 16px' }}>Usage Limit</th>
+                      <th style={{ padding: '12px 16px' }}>Status</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingCoupons ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                          <RefreshCw className="animate-spin inline-block mr-2" size={16} /> Loading coupons list...
+                        </td>
+                      </tr>
+                    ) : coupons.filter(c => c.code.toLowerCase().includes(couponSearch.toLowerCase())).length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                          No coupons found. Click 'Add New Coupon' to create one.
+                        </td>
+                      </tr>
+                    ) : coupons
+                        .filter(c => c.code.toLowerCase().includes(couponSearch.toLowerCase()))
+                        .map(coupon => {
+                          const isExpired = coupon.expiryDate && new Date(coupon.expiryDate) < new Date();
+                          const formattedExpiry = coupon.expiryDate 
+                            ? new Date(coupon.expiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : 'No Expiry';
+                          return (
+                            <tr key={coupon.code} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem', color: 'var(--charcoal)' }}>
+                              <td style={{ padding: '16px', fontWeight: 600 }}>{coupon.code}</td>
+                              <td style={{ padding: '16px' }}>
+                                {coupon.type === 'percentage' ? `${coupon.value}%` : `₹${coupon.value}`}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                {coupon.minOrderAmount > 0 ? `₹${coupon.minOrderAmount}` : 'No Min'}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                {coupon.type === 'percentage' && coupon.maxDiscount > 0 ? `₹${coupon.maxDiscount}` : 'N/A'}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                <span style={{ color: isExpired ? '#B71C1C' : 'inherit' }}>{formattedExpiry}</span>
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                {coupon.usedCount || 0} / {coupon.totalLimit > 0 ? coupon.totalLimit : '∞'}
+                              </td>
+                              <td style={{ padding: '16px' }}>
+                                {isExpired ? (
+                                  <span style={{ background: '#FFF3F3', color: '#B71C1C', fontSize: '0.75rem', fontWeight: 600, padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Expired</span>
+                                ) : coupon.active ? (
+                                  <span style={{ background: '#E8F5E9', color: '#2E7D32', fontSize: '0.75rem', fontWeight: 600, padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Active</span>
+                                ) : (
+                                  <span style={{ background: '#ECEFF1', color: '#546E7A', fontSize: '0.75rem', fontWeight: 600, padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Inactive</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '16px', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                  <button 
+                                    onClick={() => handleOpenEditCouponModal(coupon)} 
+                                    style={{ border: '1px solid var(--border-light)', background: '#FFF', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                                  >
+                                    <Edit size={12} /> Edit
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteCoupon(coupon.code)} 
+                                    style={{ border: '1px solid var(--border-light)', background: '#FFF3F3', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', color: '#B71C1C', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                                  >
+                                    <Trash2 size={12} /> Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1805,6 +2128,179 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 {editingCategory ? 'Save Changes' : 'Create Category'}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => setIsCategoryModalOpen(false)} style={{ flex: 1 }}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isCouponModalOpen && (
+        <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'fixed', zIndex: 1100, top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)' }} onClick={() => setIsCouponModalOpen(false)}>
+          <form 
+            onSubmit={handleCouponSubmit} 
+            className="admin-product-modal animate-zoom" 
+            style={{ 
+              background: '#FFF', 
+              width: 'min(600px, 95vw)', 
+              maxHeight: '90vh', 
+              borderRadius: '12px', 
+              border: '1px solid var(--border-light)', 
+              position: 'relative', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              overflow: 'hidden' 
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sticky Header */}
+            <div style={{ padding: '24px 30px 16px 30px', borderBottom: '1px solid var(--border-light)', position: 'relative', background: '#FFF', flexShrink: 0 }}>
+              <button 
+                type="button"
+                onClick={() => setIsCouponModalOpen(false)} 
+                style={{ position: 'absolute', right: '24px', top: '24px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+
+              <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.8rem', margin: 0 }}>
+                {editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}
+              </h2>
+            </div>
+
+            {/* Scrollable Body Container */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '24px 30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {formError && (
+                <div style={{ background: '#FFF8F8', border: '1px solid #FFCDD2', color: '#B71C1C', padding: '12px', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formError}
+                </div>
+              )}
+
+              {formSuccess && (
+                <div style={{ background: '#F4FAF6', border: '1px solid #C8E6C9', color: '#2E7D32', padding: '12px', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formSuccess}
+                </div>
+              )}
+
+              <div className="form-field">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Coupon Code *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. WELCOME10 (letters & numbers only)"
+                  value={cpCode}
+                  onChange={(e) => setCpCode(e.target.value)}
+                  disabled={!!editingCoupon}
+                  required 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Discount Type *</label>
+                  <select 
+                    className="form-input" 
+                    value={cpType}
+                    onChange={(e) => setCpType(e.target.value)}
+                    required
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed Amount (₹)</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Discount Value *</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 10 or 150"
+                    value={cpValue}
+                    onChange={(e) => setCpValue(e.target.value)}
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Min Order Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 500 (0 for no limit)"
+                    value={cpMinOrderAmount}
+                    onChange={(e) => setCpMinOrderAmount(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Max Discount Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 200 (0 for no limit)"
+                    value={cpMaxDiscount}
+                    onChange={(e) => setCpMaxDiscount(e.target.value)}
+                    disabled={cpType !== 'percentage'}
+                  />
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Expiry Date & Time</label>
+                <input 
+                  type="datetime-local" 
+                  className="form-input" 
+                  value={cpExpiryDate}
+                  onChange={(e) => setCpExpiryDate(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Total Usage Limit</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 100 (0 for unlimited)"
+                    value={cpTotalLimit}
+                    onChange={(e) => setCpTotalLimit(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Per User Limit</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 1 (0 for unlimited)"
+                    value={cpPerUserLimit}
+                    onChange={(e) => setCpPerUserLimit(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                <input 
+                  type="checkbox" 
+                  id="cpActiveCheckbox"
+                  checked={cpActive}
+                  onChange={(e) => setCpActive(e.target.checked)}
+                  style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="cpActiveCheckbox" style={{ fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' }}>Active (Enable coupon usage)</label>
+              </div>
+
+            </div>
+
+            {/* Sticky Footer */}
+            <div style={{ position: 'sticky', bottom: 0, background: '#FFF', borderTop: '1px solid var(--border-light)', padding: '16px 30px 24px 30px', display: 'flex', gap: '12px', zIndex: 10, flexShrink: 0 }}>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                {editingCoupon ? 'Save Changes' : 'Create Coupon'}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsCouponModalOpen(false)} style={{ flex: 1 }}>
                 Cancel
               </button>
             </div>

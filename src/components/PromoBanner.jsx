@@ -39,12 +39,12 @@ export default function PromoBanner({ onNavigate }) {
     <section className="promo-banner-section section">
       <div className="promo-banner-bg-overlay"></div>
       <div className="container promo-banner-container">
-        
+
         <div className="promo-banner-content animate-slide-up">
           <span className="promo-banner-tag">Flash Sale</span>
           <h2 className="promo-banner-title">Limited Time Offer</h2>
           <h3 className="promo-banner-subtitle">Up to 50% OFF on Selected Collections</h3>
-          
+
           <p className="promo-banner-text">
             Indulge in sheer luxury. Elevate your wardrobe with premium traditional organza drapes, hand-embroidered Anarkali kurtis, and designer maxi gowns at half price.
           </p>
@@ -72,8 +72,8 @@ export default function PromoBanner({ onNavigate }) {
             <span className="coupon-description">Use Coupon Code:</span>
             <div className="coupon-badge-container">
               <code className="coupon-code-text">RIZA50</code>
-              <button 
-                className="coupon-copy-btn" 
+              <button
+                className="coupon-copy-btn"
                 onClick={handleCopyCoupon}
                 title="Copy Coupon Code"
               >
@@ -83,23 +83,14 @@ export default function PromoBanner({ onNavigate }) {
             </div>
           </div>
 
-          <div className="promo-banner-actions">
-            <button 
-              className="btn btn-accent btn-promo-sale"
-              onClick={() => onNavigate('shop', null, true)} // Navigates to shop with sale items filtered
-            >
-              Shop The Sale
-              <ArrowRight size={18} />
-            </button>
-          </div>
         </div>
 
         {/* Floating Side Fashion Card Illustration */}
         <div className="promo-banner-visual">
           <div className="visual-card">
-            <img 
-              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80" 
-              alt="Model Promo" 
+            <img
+              src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80"
+              alt="Model Promo"
               className="visual-image"
             />
             <div className="visual-discount-badge">

@@ -9,6 +9,7 @@ export default function CartDrawer({
   onRemoveItem,
   onCheckout,
   activeCoupon,
+  appliedCoupon,
   onApplyCoupon,
   onRemoveCoupon
 }) {
@@ -20,27 +21,40 @@ export default function CartDrawer({
   // Calculations
   const subtotal = cart.reduce((total, item) => total + (item.salePrice || item.price) * item.quantity, 0);
   
-  let discountPercentage = 0;
-  if (activeCoupon === 'RIZA50') {
-    discountPercentage = 50;
-  } else if (activeCoupon === 'WELCOME10') {
-    discountPercentage = 10;
+  let discountAmount = 0;
+  let couponLabel = '';
+  if (appliedCoupon) {
+    if (appliedCoupon.type === 'percentage') {
+      let discVal = (subtotal * appliedCoupon.value) / 100;
+      if (appliedCoupon.maxDiscount > 0 && discVal > appliedCoupon.maxDiscount) {
+        discVal = appliedCoupon.maxDiscount;
+      }
+      discountAmount = Math.round(discVal);
+      couponLabel = `${appliedCoupon.value}% OFF`;
+    } else if (appliedCoupon.type === 'fixed') {
+      let discVal = appliedCoupon.value;
+      if (discVal > subtotal) {
+        discVal = subtotal;
+      }
+      discountAmount = Math.round(discVal);
+      couponLabel = `₹${appliedCoupon.value} OFF`;
+    }
   }
 
-  const discountAmount = Math.round((subtotal * discountPercentage) / 100);
   const shippingThreshold = 1499;
   const shippingFee = subtotal > 0 && (subtotal - discountAmount) >= shippingThreshold ? 0 : 99;
   const grandTotal = subtotal - discountAmount + shippingFee;
 
-  const handleApplyCouponSubmit = (e) => {
+  const handleApplyCouponSubmit = async (e) => {
     e.preventDefault();
     const cleanCode = couponInput.trim().toUpperCase();
-    if (cleanCode === 'RIZA50' || cleanCode === 'WELCOME10') {
-      onApplyCoupon(cleanCode);
+    if (!cleanCode) return;
+    const res = await onApplyCoupon(cleanCode);
+    if (res && res.success) {
       setCouponInput('');
       setCouponError('');
     } else {
-      setCouponError('Invalid coupon code. Try RIZA50 or WELCOME10');
+      setCouponError(res ? res.error : 'Invalid coupon code');
     }
   };
 
@@ -158,7 +172,7 @@ export default function CartDrawer({
                 <div className="active-coupon-pill animate-fade">
                   <div className="coupon-left">
                     <Tag size={14} className="coupon-icon-active" />
-                    <span>Coupon <strong>{activeCoupon}</strong> applied ({discountPercentage}% OFF)</span>
+                    <span>Coupon <strong>{activeCoupon}</strong> applied ({couponLabel})</span>
                   </div>
                   <button className="remove-coupon-btn" onClick={handleRemoveCouponClick}>
                     Remove
@@ -169,7 +183,7 @@ export default function CartDrawer({
                   <input
                     type="text"
                     className="form-input coupon-input"
-                    placeholder="Enter Coupon (RIZA50, WELCOME10)"
+                    placeholder="Enter Coupon Code"
                     value={couponInput}
                     onChange={(e) => setCouponInput(e.target.value)}
                   />

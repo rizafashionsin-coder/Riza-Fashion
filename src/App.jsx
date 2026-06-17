@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { subscribeToAuthState } from './services/firebaseServices';
 import { products as initialProducts } from './data/products';
 import { HelpCircle, Star, Phone, MessageSquare, ShieldCheck, Truck, RefreshCw, User } from 'lucide-react';
@@ -639,6 +639,7 @@ export default function App() {
   });
 
   const [activeCoupon, setActiveCoupon] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   // Sync to localStorage
   useEffect(() => {
@@ -788,9 +789,9 @@ export default function App() {
       images: item.images || []
     }));
 
-    const subtotalVal = orderDetails.pricing?.subtotal || orderDetails.totals?.subtotal || 0;
-    const shippingChargeVal = orderDetails.pricing?.shipping !== undefined ? orderDetails.pricing.shipping : (orderDetails.totals ? (orderDetails.totals.subtotal >= 1499 ? 0 : 99) : 0);
-    const totalAmountVal = orderDetails.pricing?.total || orderDetails.totals?.grandTotal || 0;
+    const subtotalVal = orderDetails.pricing?.subtotal || 0;
+    const shippingChargeVal = orderDetails.pricing?.shipping !== undefined ? orderDetails.pricing.shipping : 0;
+    const totalAmountVal = orderDetails.pricing?.total || 0;
     const paymentMethodVal = orderDetails.paymentMethod || 'razorpay';
 
     // Build the exact required Firestore document structure
@@ -811,7 +812,10 @@ export default function App() {
       items: itemsVal,
       subtotal: subtotalVal,
       shippingCharge: shippingChargeVal,
-      totalAmount: totalAmountVal,
+      couponCode: orderDetails.pricing?.coupon || null,
+      discountAmount: orderDetails.pricing?.discount || 0,
+      finalAmount: totalAmountVal,
+      totalAmount: totalAmountVal, // compatibility fallback
       paymentMethod: paymentMethodVal,
       paymentStatus: orderDetails.paymentStatus || 'Paid',
       orderStatus: orderDetails.orderStatus || 'Pending',
@@ -867,13 +871,108 @@ export default function App() {
     });
   };
 
-  // 5. Coupon Handling
-  const handleApplyCoupon = (code) => {
-    setActiveCoupon(code);
+  // 5. Coupon Handling & Revalidation
+  useEffect(() => {
+    const revalidateCoupon = async () => {
+      if (!activeCoupon) {
+        setAppliedCoupon(null);
+        return;
+      }
+      try {
+        const docRef = doc(db, 'coupons', activeCoupon);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          setAppliedCoupon(null);
+          setActiveCoupon('');
+          return;
+        }
+        const data = docSnap.data();
+        const subtotal = cart.reduce((sum, item) => sum + (item.salePrice || item.price) * item.quantity, 0);
+        
+        // Basic validation checks
+        if (
+          data.active === false || 
+          (data.expiryDate && new Date(data.expiryDate) < new Date()) ||
+          (data.totalLimit > 0 && (data.usedCount || 0) >= data.totalLimit) ||
+          (data.minOrderAmount > 0 && subtotal < data.minOrderAmount)
+        ) {
+          setAppliedCoupon(null);
+          setActiveCoupon('');
+          return;
+        }
+
+        // Per user usage check
+        if (currentUser && data.perUserLimit > 0) {
+          const ordersRef = collection(db, 'orders');
+          const q = query(
+            ordersRef,
+            where('userId', '==', currentUser.uid),
+            where('couponCode', '==', activeCoupon)
+          );
+          const querySnapshot = await getDocs(q);
+          if (querySnapshot.size >= data.perUserLimit) {
+            setAppliedCoupon(null);
+            setActiveCoupon('');
+            return;
+          }
+        }
+
+        setAppliedCoupon(data);
+      } catch (err) {
+        console.error("Error revalidating coupon:", err);
+      }
+    };
+
+    revalidateCoupon();
+  }, [cart, currentUser, activeCoupon]);
+
+  const handleApplyCoupon = async (code) => {
+    if (!code) return { success: false, error: "Please enter a coupon code." };
+    const cleanCode = code.trim().toUpperCase();
+    try {
+      const docRef = doc(db, 'coupons', cleanCode);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        return { success: false, error: "Coupon code does not exist." };
+      }
+      const data = docSnap.data();
+      if (data.active === false) {
+        return { success: false, error: "This coupon is currently inactive." };
+      }
+      if (data.expiryDate && new Date(data.expiryDate) < new Date()) {
+        return { success: false, error: "This coupon has expired." };
+      }
+      if (data.totalLimit > 0 && (data.usedCount || 0) >= data.totalLimit) {
+        return { success: false, error: "This coupon's usage limit has been reached." };
+      }
+      const subtotal = cart.reduce((sum, item) => sum + (item.salePrice || item.price) * item.quantity, 0);
+      if (data.minOrderAmount > 0 && subtotal < data.minOrderAmount) {
+        return { success: false, error: `Minimum order amount of ₹${data.minOrderAmount} is required for this coupon.` };
+      }
+      if (currentUser && data.perUserLimit > 0) {
+        const ordersRef = collection(db, 'orders');
+        const q = query(
+          ordersRef,
+          where('userId', '==', currentUser.uid),
+          where('couponCode', '==', cleanCode)
+        );
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.size >= data.perUserLimit) {
+          return { success: false, error: `You have reached the maximum usage limit (${data.perUserLimit}) for this coupon.` };
+        }
+      }
+      setActiveCoupon(cleanCode);
+      setAppliedCoupon(data);
+      return { success: true };
+    } catch (err) {
+      console.error("Error applying coupon:", err);
+      return { success: false, error: "Error validating coupon. Please try again." };
+    }
   };
 
   const handleRemoveCoupon = () => {
     setActiveCoupon('');
+    setAppliedCoupon(null);
   };
 
 
@@ -972,6 +1071,7 @@ export default function App() {
               onRemoveItem={handleRemoveItem}
               onNavigate={handleNavigate}
               activeCoupon={activeCoupon}
+              appliedCoupon={appliedCoupon}
               onApplyCoupon={handleApplyCoupon}
               onRemoveCoupon={handleRemoveCoupon}
               triggerAuthCheck={triggerAuthCheck}
@@ -1100,6 +1200,7 @@ export default function App() {
           }, "Please login to continue shopping.");
         }}
         activeCoupon={activeCoupon}
+        appliedCoupon={appliedCoupon}
         onApplyCoupon={handleApplyCoupon}
         onRemoveCoupon={handleRemoveCoupon}
       />

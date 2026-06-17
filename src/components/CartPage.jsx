@@ -7,6 +7,7 @@ export default function CartPage({
   onRemoveItem,
   onNavigate,
   activeCoupon,
+  appliedCoupon,
   onApplyCoupon,
   onRemoveCoupon,
   triggerAuthCheck
@@ -22,10 +23,20 @@ export default function CartPage({
 
   // Coupon Discount
   let discount = 0;
-  if (activeCoupon === 'RIZA50') {
-    discount = subtotal * 0.5;
-  } else if (activeCoupon === 'WELCOME10') {
-    discount = subtotal * 0.1;
+  if (appliedCoupon) {
+    if (appliedCoupon.type === 'percentage') {
+      let discVal = (subtotal * appliedCoupon.value) / 100;
+      if (appliedCoupon.maxDiscount > 0 && discVal > appliedCoupon.maxDiscount) {
+        discVal = appliedCoupon.maxDiscount;
+      }
+      discount = Math.round(discVal);
+    } else if (appliedCoupon.type === 'fixed') {
+      let discVal = appliedCoupon.value;
+      if (discVal > subtotal) {
+        discVal = subtotal;
+      }
+      discount = Math.round(discVal);
+    }
   }
 
   // Shipping (Free above 1499, else 150)
@@ -33,15 +44,16 @@ export default function CartPage({
   const shippingCost = subtotal >= shippingThreshold || subtotal === 0 ? 0 : 150;
   const total = subtotal - discount + shippingCost;
 
-  const handleApplyCouponClick = (e) => {
+  const handleApplyCouponClick = async (e) => {
     e.preventDefault();
     setCouponError('');
     const code = couponInput.trim().toUpperCase();
-    if (code === 'RIZA50' || code === 'WELCOME10') {
-      onApplyCoupon(code);
+    if (!code) return;
+    const res = await onApplyCoupon(code);
+    if (res && res.success) {
       setCouponInput('');
     } else {
-      setCouponError('Invalid coupon code. Try RIZA50 or WELCOME10.');
+      setCouponError(res ? res.error : 'Invalid coupon code.');
     }
   };
 
@@ -178,7 +190,7 @@ export default function CartPage({
               )}
               
               <div className="coupon-helper-tips">
-                <span>💡 Tip: Try <strong>WELCOME10</strong> (10% OFF) or <strong>RIZA50</strong> (50% OFF mock savings)</span>
+                <span>💡 Tip: Try coupons created via the Admin Dashboard (e.g. WELCOME10)</span>
               </div>
             </div>
 

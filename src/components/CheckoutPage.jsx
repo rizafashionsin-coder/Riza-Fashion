@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CreditCard, ShieldCheck, ShoppingBag, ChevronRight } from 'lucide-react';
-import { auth } from '../firebase';
+import { CreditCard, ShieldCheck, ShoppingBag, ChevronRight, Tag } from 'lucide-react';
+import { auth, db } from '../firebase';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
 
 export default function CheckoutPage({
   cart,
@@ -107,34 +108,166 @@ export default function CheckoutPage({
     return sum + (price * item.quantity);
   }, 0);
 
-  // Coupon Discount
-  let discount = 0;
-  if (activeCoupon === 'RIZA50') {
-    discount = subtotal * 0.5;
-  } else if (activeCoupon === 'WELCOME10') {
-    discount = subtotal * 0.1;
-  }
+  // Dynamic Coupon Validation & State
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  // Shipping calculation based on dynamic delivery settings and customer location
-  const shippingThreshold = deliverySettings ? (deliverySettings.freeShippingThreshold || 1499) : 1499;
-  
-  const shippingCost = useMemo(() => {
-    if (subtotal >= shippingThreshold || subtotal === 0) return 0;
-    
-    // Check if destination is Tamil Nadu
+  // Auto-apply coupon from props if it exists
+  useEffect(() => {
+    if (activeCoupon) {
+      validateAndApplyCoupon(activeCoupon);
+    }
+  }, [activeCoupon, subtotal]);
+
+  const validateAndApplyCoupon = async (codeToApply) => {
+    if (!codeToApply) return;
+    setValidatingCoupon(true);
+    setCouponError('');
+    try {
+      const code = codeToApply.trim().toUpperCase();
+      const couponDocRef = doc(db, 'coupons', code);
+      const couponSnap = await getDoc(couponDocRef);
+
+      if (!couponSnap.exists()) {
+        setCouponError("Coupon code does not exist.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      const couponData = couponSnap.data();
+
+      // Check active status
+      if (couponData.active === false) {
+        setCouponError("This coupon is currently inactive.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check expiry date
+      if (couponData.expiryDate) {
+        const expiry = new Date(couponData.expiryDate);
+        if (expiry < new Date()) {
+          setCouponError("This coupon has expired.");
+          setAppliedCoupon(null);
+          setValidatingCoupon(false);
+          return;
+        }
+      }
+
+      // Check total limit
+      if (couponData.totalLimit > 0 && (couponData.usedCount || 0) >= couponData.totalLimit) {
+        setCouponError("This coupon's usage limit has been reached.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check minimum order amount
+      if (couponData.minOrderAmount > 0 && subtotal < couponData.minOrderAmount) {
+        setCouponError(`Minimum order amount of ₹${couponData.minOrderAmount} is required for this coupon.`);
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check per-user limit
+      const user = auth.currentUser;
+      if (user && couponData.perUserLimit > 0) {
+        const q = query(
+          collection(db, 'orders'),
+          where('userId', '==', user.uid),
+          where('couponCode', '==', code)
+        );
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.size >= couponData.perUserLimit) {
+          setCouponError(`You have reached the maximum usage limit (${couponData.perUserLimit}) for this coupon.`);
+          setAppliedCoupon(null);
+          setValidatingCoupon(false);
+          return;
+        }
+      }
+
+      // All validation passed
+      setAppliedCoupon(couponData);
+      setCouponError('');
+    } catch (err) {
+      console.error("Error validating coupon:", err);
+      setCouponError("Error validating coupon. Please try again.");
+      setAppliedCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  // Coupon Discount
+  const discount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.type === 'percentage') {
+      let discVal = (subtotal * appliedCoupon.value) / 100;
+      if (appliedCoupon.maxDiscount > 0 && discVal > appliedCoupon.maxDiscount) {
+        discVal = appliedCoupon.maxDiscount;
+      }
+      return Math.round(discVal);
+    } else if (appliedCoupon.type === 'fixed') {
+      let discVal = appliedCoupon.value;
+      if (discVal > subtotal) {
+        discVal = subtotal;
+      }
+      return Math.round(discVal);
+    }
+    return 0;
+  }, [appliedCoupon, subtotal]);
+
+  // ─── SHIPPING CHARGE CALCULATION ──────────────────────────────────────────
+  // Free shipping is based on RAW SUBTOTAL (before coupon).
+  // Coupon discounts reduce product price, not shipping eligibility.
+  const shippingThreshold = deliverySettings
+    ? (deliverySettings.freeShippingThreshold || 1499)
+    : 1499;
+
+  const shippingCharge = useMemo(() => {
+    // No items → no shipping
+    if (subtotal === 0) return 0;
+
+    // Tamil Nadu — district-wise charge from Firebase
     const isTN = stateVal.trim().toLowerCase() === 'tamil nadu' || stateVal.trim().toLowerCase() === 'tamilnadu';
     if (isTN) {
       const selectedDistrict = city.trim().toLowerCase();
-      if (deliverySettings && deliverySettings.charges && deliverySettings.charges[selectedDistrict] !== undefined) {
+      if (
+        deliverySettings &&
+        deliverySettings.charges &&
+        deliverySettings.charges[selectedDistrict] !== undefined
+      ) {
         return Number(deliverySettings.charges[selectedDistrict]);
       }
-      return 90; // Fallback district shipping fee
+      return 90; // Fallback for unrecognised TN district
     }
-    
-    return deliverySettings ? (deliverySettings.defaultCharge || 150) : 150;
-  }, [subtotal, stateVal, city, deliverySettings, shippingThreshold]);
 
-  const total = subtotal - discount + shippingCost;
+    // Default non-TN shipping
+    return deliverySettings ? (Number(deliverySettings.defaultCharge) || 150) : 150;
+  }, [subtotal, stateVal, city, deliverySettings]);
+
+  // ─── FINAL TOTAL ──────────────────────────────────────────────────────────
+  // Formula: Subtotal + ShippingCharge - CouponDiscount
+  const discountAmount = discount;
+  const finalTotal = subtotal + shippingCharge - discountAmount;
+
+  // ─── DISTRICT CHANGE LOGGER ──────────────────────────────────────────────
+  // Fires every time the user picks a different city / district.
+  useEffect(() => {
+    const selectedDistrict = (city || '').trim().toLowerCase();
+    const shippingSettings  = deliverySettings || null;
+    console.log("Selected District:", selectedDistrict);
+    console.log("Shipping Settings:", shippingSettings);
+    console.log("Shipping Charge:", shippingCharge);
+    console.log("Subtotal:", subtotal);
+    console.log("Final Total:", finalTotal);
+    console.log("--- threshold:", shippingThreshold, "| subtotal >= threshold?", subtotal >= shippingThreshold);
+  }, [city, shippingCharge, finalTotal]);
 
   // Handle place order submit
   const handlePlaceOrderSubmit = async (e) => {
@@ -152,7 +285,15 @@ export default function CheckoutPage({
     // Generate simulated Order ID
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const orderId = `RIZA-${randomNum}`;
-    const payableTotal = total;
+
+    // ─── DEBUG LOGS ───────────────────────────────────────────────────────────
+    console.log('Subtotal:', subtotal);
+    console.log('Shipping:', shippingCharge);
+    console.log('Discount:', discountAmount);
+    console.log('Final Total:', finalTotal);
+    console.log('Razorpay Amount (paise):', finalTotal * 100);
+    console.log('District selected:', city, '| State:', stateVal);
+    console.log('deliverySettings charges:', deliverySettings?.charges);
 
     const orderDetails = {
       orderId,
@@ -168,10 +309,10 @@ export default function CheckoutPage({
       items: [...selectedCheckoutItems],
       pricing: { 
         subtotal, 
-        discount, 
-        coupon: activeCoupon, 
-        shipping: shippingCost, 
-        total: payableTotal 
+        discount: discountAmount, 
+        coupon: appliedCoupon ? appliedCoupon.code : '', 
+        shipping: shippingCharge, 
+        total: finalTotal 
       },
       notes: orderNotes,
       status: 'Ordered', // Ordered -> Processing -> Shipped -> Out for Delivery -> Delivered
@@ -205,12 +346,25 @@ export default function CheckoutPage({
 
     const options = {
       key: razorpayKey,
-      amount: payableTotal * 100, // paise
+      amount: finalTotal * 100, // Amount in paise — Subtotal + Shipping - Coupon Discount
       currency: "INR",
       name: "Riza Fashions",
       description: `Payment for Order #${orderId}`,
       image: "https://riza-fashions-c2d77.web.app/favicon-icon.png",
-      handler: function (response) {
+      handler: async function (response) {
+        // Increment coupon usedCount in Firestore if coupon was applied
+        if (appliedCoupon) {
+          try {
+            const couponRef = doc(db, 'coupons', appliedCoupon.code);
+            await updateDoc(couponRef, {
+              usedCount: increment(1)
+            });
+            console.log("Successfully incremented usedCount for coupon:", appliedCoupon.code);
+          } catch (couponErr) {
+            console.error("Failed to increment coupon usedCount:", couponErr);
+          }
+        }
+
         const finalOrder = {
           ...orderDetails,
           paymentMethod: 'razorpay',
@@ -557,6 +711,42 @@ export default function CheckoutPage({
               })}
             </div>
 
+            {/* Coupon Code Section */}
+            <div className="cart-coupon-section" style={{ marginTop: '20px', marginBottom: '16px' }}>
+              {appliedCoupon ? (
+                <div className="active-coupon-pill animate-fade" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e8f5e9', border: '1px solid #c8e6c9', color: '#2e7d32', padding: '8px 12px', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  <div className="coupon-left" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Tag size={14} className="coupon-icon-active" style={{ color: '#2e7d32' }} />
+                    <span>Coupon <strong>{appliedCoupon.code}</strong> applied ({appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : `₹${appliedCoupon.value}`} OFF)</span>
+                  </div>
+                  <button type="button" className="remove-coupon-btn" onClick={() => { setAppliedCoupon(null); setCouponInput(''); }} style={{ color: '#c62828', fontWeight: 600, textTransform: 'uppercase', fontSize: '0.7rem', border: 'none', background: 'none', cursor: 'pointer' }}>
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    className="form-input coupon-input"
+                    placeholder="Enter Coupon Code"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value)}
+                    style={{ flex: 1, padding: '8px 14px', fontSize: '0.8rem', borderRadius: '20px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                  />
+                  <button 
+                    type="button" 
+                    className="coupon-apply-submit" 
+                    onClick={() => validateAndApplyCoupon(couponInput)}
+                    disabled={validatingCoupon || !couponInput.trim()}
+                    style={{ background: 'var(--charcoal)', color: 'var(--secondary)', borderRadius: '20px', padding: '8px 16px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                  >
+                    {validatingCoupon ? '...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="coupon-error-text animate-slide-down" style={{ fontSize: '0.75rem', color: '#c62828', marginTop: '6px', paddingLeft: '8px' }}>{couponError}</p>}
+            </div>
+
             {/* Price Calculations */}
             <div className="summary-rows" style={{ marginTop: '20px' }}>
               <div className="summary-row">
@@ -564,23 +754,23 @@ export default function CheckoutPage({
                 <span>₹{subtotal}</span>
               </div>
               
-              {discount > 0 && (
-                <div className="summary-row discount-row">
-                  <span>Promo Discount ({activeCoupon})</span>
-                  <span>-₹{discount}</span>
+              {discountAmount > 0 && (
+                <div className="summary-row discount-row" style={{ color: '#2e7d32' }}>
+                  <span>Promo Discount ({appliedCoupon ? appliedCoupon.code : ''})</span>
+                  <span>-₹{discountAmount}</span>
                 </div>
               )}
-
+ 
               <div className="summary-row">
-                <span>Express Shipping</span>
-                <span>{shippingCost === 0 ? "FREE" : `₹${shippingCost}`}</span>
+                <span>Shipping</span>
+                <span>{shippingCharge === 0 ? "FREE" : `₹${shippingCharge}`}</span>
               </div>
-
+ 
               <div className="summary-divider"></div>
-
+ 
               <div className="summary-row total-row">
                 <span>Payable Total</span>
-                <span>₹{total}</span>
+                <span>₹{finalTotal}</span>
               </div>
             </div>
 
@@ -596,7 +786,7 @@ export default function CheckoutPage({
                   Processing Payment...
                 </>
               ) : (
-                `Pay Securely with Razorpay (₹${total})`
+                `Pay Securely with Razorpay (₹${finalTotal})`
               )}
             </button>
             

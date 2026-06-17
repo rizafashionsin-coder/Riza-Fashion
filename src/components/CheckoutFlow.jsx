@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, ArrowLeft, ArrowRight, CreditCard, ShieldCheck, CheckCircle2, Copy, Check } from 'lucide-react';
-import { auth } from '../firebase';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, ArrowLeft, ArrowRight, CreditCard, ShieldCheck, CheckCircle2, Copy, Check, Tag } from 'lucide-react';
+import { auth, db } from '../firebase';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
 
 export default function CheckoutFlow({
   isOpen,
@@ -12,7 +13,6 @@ export default function CheckoutFlow({
   onNavigate,
   deliverySettings
 }) {
-  if (!isOpen) return null;
 
   const tnDistrictsList = [
     "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", 
@@ -46,37 +46,168 @@ export default function CheckoutFlow({
   // Calculations
   const subtotal = cart.reduce((total, item) => total + (item.salePrice || item.price) * item.quantity, 0);
   
-  let discountPercentage = 0;
-  if (activeCoupon === 'RIZA50') {
-    discountPercentage = 50;
-  } else if (activeCoupon === 'WELCOME10') {
-    discountPercentage = 10;
-  }
+  // Dynamic Coupon Validation & State
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  const discountAmount = Math.round((subtotal * discountPercentage) / 100);
-  
-  const shippingThreshold = deliverySettings ? (deliverySettings.freeShippingThreshold || 1499) : 1499;
+  // Auto-apply coupon from props if it exists
+  useEffect(() => {
+    if (activeCoupon) {
+      validateAndApplyCoupon(activeCoupon);
+    }
+  }, [activeCoupon, subtotal]);
 
-  const shippingFee = (() => {
-    const totalBeforeShipping = subtotal - discountAmount;
-    if (totalBeforeShipping >= shippingThreshold || totalBeforeShipping === 0) return 0;
+  const validateAndApplyCoupon = async (codeToApply) => {
+    if (!codeToApply) return;
+    setValidatingCoupon(true);
+    setCouponError('');
+    try {
+      const code = codeToApply.trim().toUpperCase();
+      const couponDocRef = doc(db, 'coupons', code);
+      const couponSnap = await getDoc(couponDocRef);
 
-    const stateVal = shippingForm.state || '';
-    const cityVal = shippingForm.city || '';
-
-    const isTN = stateVal.trim().toLowerCase() === 'tamil nadu' || stateVal.trim().toLowerCase() === 'tamilnadu';
-    if (isTN) {
-      const selectedDistrict = cityVal.trim().toLowerCase();
-      if (deliverySettings && deliverySettings.charges && deliverySettings.charges[selectedDistrict] !== undefined) {
-        return Number(deliverySettings.charges[selectedDistrict]);
+      if (!couponSnap.exists()) {
+        setCouponError("Coupon code does not exist.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
       }
-      return 90; // Fallback district shipping fee
+
+      const couponData = couponSnap.data();
+
+      // Check active status
+      if (couponData.active === false) {
+        setCouponError("This coupon is currently inactive.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check expiry date
+      if (couponData.expiryDate) {
+        const expiry = new Date(couponData.expiryDate);
+        if (expiry < new Date()) {
+          setCouponError("This coupon has expired.");
+          setAppliedCoupon(null);
+          setValidatingCoupon(false);
+          return;
+        }
+      }
+
+      // Check total limit
+      if (couponData.totalLimit > 0 && (couponData.usedCount || 0) >= couponData.totalLimit) {
+        setCouponError("This coupon's usage limit has been reached.");
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check minimum order amount
+      if (couponData.minOrderAmount > 0 && subtotal < couponData.minOrderAmount) {
+        setCouponError(`Minimum order amount of ₹${couponData.minOrderAmount} is required for this coupon.`);
+        setAppliedCoupon(null);
+        setValidatingCoupon(false);
+        return;
+      }
+
+      // Check per-user limit
+      const user = auth.currentUser;
+      if (user && couponData.perUserLimit > 0) {
+        const q = query(
+          collection(db, 'orders'),
+          where('userId', '==', user.uid),
+          where('couponCode', '==', code)
+        );
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.size >= couponData.perUserLimit) {
+          setCouponError(`You have reached the maximum usage limit (${couponData.perUserLimit}) for this coupon.`);
+          setAppliedCoupon(null);
+          setValidatingCoupon(false);
+          return;
+        }
+      }
+
+      // All validation passed
+      setAppliedCoupon(couponData);
+      setCouponError('');
+    } catch (err) {
+      console.error("Error validating coupon:", err);
+      setCouponError("Error validating coupon. Please try again.");
+      setAppliedCoupon(null);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  // Coupon Discount
+  const discount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.type === 'percentage') {
+      let discVal = (subtotal * appliedCoupon.value) / 100;
+      if (appliedCoupon.maxDiscount > 0 && discVal > appliedCoupon.maxDiscount) {
+        discVal = appliedCoupon.maxDiscount;
+      }
+      return Math.round(discVal);
+    } else if (appliedCoupon.type === 'fixed') {
+      let discVal = appliedCoupon.value;
+      if (discVal > subtotal) {
+        discVal = subtotal;
+      }
+      return Math.round(discVal);
+    }
+    return 0;
+  }, [appliedCoupon, subtotal]);
+
+  // ─── SHIPPING CHARGE CALCULATION ──────────────────────────────────────────
+  // Free shipping threshold is based on RAW SUBTOTAL only.
+  // Coupon discounts reduce the product price, NOT the shipping eligibility.
+  const shippingThreshold = deliverySettings
+    ? (deliverySettings.freeShippingThreshold || 1499)
+    : 1499;
+
+  const shippingCharge = useMemo(() => {
+    // No items in cart → no shipping
+    if (subtotal === 0) return 0;
+
+    const stateVal = (shippingForm.state || '').trim().toLowerCase();
+    const cityVal  = (shippingForm.city  || '').trim().toLowerCase();
+
+    // Tamil Nadu — use district-specific charge from Firebase
+    if (stateVal === 'tamil nadu' || stateVal === 'tamilnadu') {
+      if (
+        deliverySettings &&
+        deliverySettings.charges &&
+        deliverySettings.charges[cityVal] !== undefined
+      ) {
+        return Number(deliverySettings.charges[cityVal]);
+      }
+      return 90; // Fallback for unrecognised TN district
     }
 
-    return deliverySettings ? (deliverySettings.defaultCharge || 150) : 150;
-  })();
+    // All other states → default charge
+    return deliverySettings ? (Number(deliverySettings.defaultCharge) || 150) : 150;
+  }, [subtotal, shippingForm.state, shippingForm.city, deliverySettings]);
 
-  const grandTotal = subtotal - discountAmount + shippingFee;
+  // ─── FINAL TOTAL ──────────────────────────────────────────────────────────
+  // Formula: Subtotal + ShippingCharge - CouponDiscount
+  const discountAmount = discount;
+  const finalTotal = subtotal + shippingCharge - discountAmount;
+
+
+  // ─── DISTRICT CHANGE LOGGER ──────────────────────────────────────────────
+  // Fires every time the user picks a different city / district.
+  useEffect(() => {
+    const selectedDistrict = (shippingForm.city || '').trim().toLowerCase();
+    const shippingSettings  = deliverySettings || null;
+    console.log("Selected District:", selectedDistrict);
+    console.log("Shipping Settings:", shippingSettings);
+    console.log("Shipping Charge:", shippingCharge);
+    console.log("Subtotal:", subtotal);
+    console.log("Final Total:", finalTotal);
+    console.log("--- threshold:", shippingThreshold, "| subtotal >= threshold?", subtotal >= shippingThreshold);
+  }, [shippingForm.city, shippingCharge, finalTotal]);
 
   const handleShippingChange = (e) => {
     setShippingForm({ ...shippingForm, [e.target.name]: e.target.value });
@@ -102,7 +233,15 @@ export default function CheckoutFlow({
       return;
     }
 
-    // Simulate placing order
+    // ─── DEBUG LOGS ───────────────────────────────────────────────────────────
+    console.log('Subtotal:', subtotal);
+    console.log('Shipping:', shippingCharge);
+    console.log('Discount:', discountAmount);
+    console.log('Final Total:', finalTotal);
+    console.log('Razorpay Amount (paise):', finalTotal * 100);
+    console.log('District selected:', shippingForm.city, '| State:', shippingForm.state);
+    console.log('deliverySettings charges:', deliverySettings?.charges);
+
     const orderId = `RIZA-${Math.floor(1000 + Math.random() * 9000)}`;
     setGeneratedOrderId(orderId);
 
@@ -111,12 +250,14 @@ export default function CheckoutFlow({
       date: new Date().toISOString().split('T')[0],
       items: [...cart],
       shippingInfo: { ...shippingForm },
-      totals: {
+      pricing: {
         subtotal,
-        discountAmount,
-        grandTotal
+        discount: discountAmount,
+        coupon: appliedCoupon ? appliedCoupon.code : '',
+        shipping: shippingCharge,
+        total: finalTotal
       },
-      status: 'Ordered' // Timeline: Ordered -> Processing -> Shipped -> Out for Delivery -> Delivered
+      status: 'Ordered'
     };
 
     console.log("VITE_RAZORPAY_KEY_ID:", import.meta.env.VITE_RAZORPAY_KEY_ID);
@@ -129,12 +270,25 @@ export default function CheckoutFlow({
 
     const options = {
       key: razorpayKey,
-      amount: grandTotal * 100, // paise
+      amount: finalTotal * 100, // Amount in paise — includes shipping, minus coupon
       currency: "INR",
       name: "Riza Fashions",
       description: `Payment for Order #${orderId}`,
       image: "https://riza-fashions-c2d77.web.app/favicon-icon.png",
-      handler: function (response) {
+      handler: async function (response) {
+        // Increment coupon usedCount in Firestore if coupon was applied
+        if (appliedCoupon) {
+          try {
+            const couponRef = doc(db, 'coupons', appliedCoupon.code);
+            await updateDoc(couponRef, {
+              usedCount: increment(1)
+            });
+            console.log("Successfully incremented usedCount for coupon:", appliedCoupon.code);
+          } catch (couponErr) {
+            console.error("Failed to increment coupon usedCount:", couponErr);
+          }
+        }
+
         const finalDetails = {
           ...baseOrderDetails,
           paymentMethod: 'razorpay',
@@ -171,7 +325,7 @@ export default function CheckoutFlow({
     };
 
     try {
-      console.log('RAZORPAY OPTIONS', options);
+      console.log('Razorpay options being sent:', options);
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
@@ -191,6 +345,8 @@ export default function CheckoutFlow({
     onClose();
     onNavigate('tracking');
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="checkout-modal-wrapper">
@@ -376,29 +532,65 @@ export default function CheckoutFlow({
                     </div>
                   ))}
                 </div>
+                 <hr className="summary-divider" />
+                 
+                 {/* Coupon Code Section */}
+                 <div className="cart-coupon-section" style={{ marginBottom: '16px' }}>
+                   {appliedCoupon ? (
+                     <div className="active-coupon-pill animate-fade" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e8f5e9', border: '1px solid #c8e6c9', color: '#2e7d32', padding: '8px 12px', borderRadius: '6px', fontSize: '0.75rem' }}>
+                       <div className="coupon-left" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                         <Tag size={14} className="coupon-icon-active" style={{ color: '#2e7d32' }} />
+                         <span>Coupon <strong>{appliedCoupon.code}</strong> applied ({appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}%` : `₹${appliedCoupon.value}`} OFF)</span>
+                       </div>
+                       <button type="button" className="remove-coupon-btn" onClick={() => { setAppliedCoupon(null); setCouponInput(''); }} style={{ color: '#c62828', fontWeight: 600, textTransform: 'uppercase', fontSize: '0.7rem', border: 'none', background: 'none', cursor: 'pointer' }}>
+                         Remove
+                       </button>
+                     </div>
+                   ) : (
+                     <div style={{ display: 'flex', gap: '8px' }}>
+                       <input
+                         type="text"
+                         className="form-input coupon-input"
+                         placeholder="Enter Coupon Code"
+                         value={couponInput}
+                         onChange={(e) => setCouponInput(e.target.value)}
+                         style={{ flex: 1, padding: '8px 14px', fontSize: '0.8rem', borderRadius: '20px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                       />
+                       <button 
+                         type="button" 
+                         className="coupon-apply-submit" 
+                         onClick={() => validateAndApplyCoupon(couponInput)}
+                         disabled={validatingCoupon || !couponInput.trim()}
+                         style={{ background: 'var(--charcoal)', color: 'var(--secondary)', borderRadius: '20px', padding: '8px 16px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                       >
+                         {validatingCoupon ? '...' : 'Apply'}
+                       </button>
+                     </div>
+                   )}
+                   {couponError && <p className="coupon-error-text animate-slide-down" style={{ fontSize: '0.75rem', color: '#c62828', marginTop: '6px', paddingLeft: '8px' }}>{couponError}</p>}
+                 </div>
 
-                <hr className="summary-divider" />
-                <div className="sidebar-pricing">
-                  <div className="sidebar-pricing-row">
-                    <span>Subtotal</span>
-                    <span>₹{subtotal}</span>
-                  </div>
-                  {discountAmount > 0 && (
-                    <div className="sidebar-pricing-row discount-row">
-                      <span>Discount</span>
-                      <span>-₹{discountAmount}</span>
-                    </div>
-                  )}
-                  <div className="sidebar-pricing-row">
-                    <span>Shipping Fee</span>
-                    <span>{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
-                  </div>
-                  <hr className="summary-divider" />
-                  <div className="sidebar-pricing-row total-row">
-                    <span>Total</span>
-                    <span>₹{grandTotal}</span>
-                  </div>
-                </div>
+                 <div className="sidebar-pricing">
+                   <div className="sidebar-pricing-row">
+                     <span>Subtotal</span>
+                     <span>₹{subtotal}</span>
+                   </div>
+                   {discountAmount > 0 && (
+                     <div className="sidebar-pricing-row discount-row" style={{ color: '#2e7d32' }}>
+                       <span>Discount ({appliedCoupon ? appliedCoupon.code : ''})</span>
+                       <span>-₹{discountAmount}</span>
+                     </div>
+                   )}
+                   <div className="sidebar-pricing-row">
+                     <span>Shipping Fee</span>
+                     <span>{shippingCharge === 0 ? 'FREE' : `₹${shippingCharge}`}</span>
+                   </div>
+                   <hr className="summary-divider" />
+                   <div className="sidebar-pricing-row total-row">
+                     <span>Total</span>
+                     <span>₹{finalTotal}</span>
+                   </div>
+                 </div>
               </div>
 
             </div>
@@ -450,7 +642,7 @@ export default function CheckoutFlow({
                           Processing Payment...
                         </>
                       ) : (
-                        `Pay Securely with Razorpay (₹${grandTotal})`
+                        `Pay Securely with Razorpay (₹${finalTotal})`
                       )}
                     </button>
                   </div>
@@ -469,7 +661,7 @@ export default function CheckoutFlow({
                   <hr className="summary-divider" />
                   <div className="sidebar-pricing-row total-row">
                     <span>Amount Due</span>
-                    <span>₹{grandTotal}</span>
+                    <span>₹{finalTotal}</span>
                   </div>
                 </div>
 
