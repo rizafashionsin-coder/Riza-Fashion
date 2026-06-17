@@ -13,7 +13,8 @@ export default function Navbar({
   setSearchQuery,
   onOpenCart,
   onOpenAccount,
-  currentUser
+  currentUser,
+  categories
 }) {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -42,15 +43,21 @@ export default function Navbar({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const dynamicLinks = categories && categories.length > 0
+    ? categories.map(cat => ({ label: cat.name, view: 'shop', category: cat.id }))
+    : [
+        { label: 'Sarees', view: 'shop', category: 'sarees' },
+        { label: 'Kurtis', view: 'shop', category: 'kurtis' },
+        { label: 'Maxi', view: 'shop', category: 'maxi' },
+        { label: 'Night Wears', view: 'shop', category: 'nightwear' },
+        { label: 'Hijabs', view: 'shop', category: 'hijabs' },
+        { label: 'Accessories', view: 'shop', category: 'accessories' }
+      ];
+
   const navLinks = [
     { label: 'Home', view: 'home' },
     { label: 'Shop', view: 'shop' },
-    { label: 'Sarees', view: 'shop', category: 'sarees' },
-    { label: 'Kurtis', view: 'shop', category: 'kurtis' },
-    { label: 'Maxi', view: 'shop', category: 'maxi' },
-    { label: 'Night Wears', view: 'shop', category: 'nightwear' },
-    { label: 'Hijabs', view: 'shop', category: 'hijabs' },
-    { label: 'Accessories', view: 'shop', category: 'accessories' },
+    ...dynamicLinks,
     { label: 'Sale', view: 'shop', isSale: true },
     { label: 'Contact', view: 'contact' }
   ];
