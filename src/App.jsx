@@ -24,7 +24,7 @@ import ProductCard from './components/ProductCard';
 import ProductQuickView from './components/ProductQuickView';
 import CartDrawer from './components/CartDrawer';
 import CheckoutFlow from './components/CheckoutFlow';
-import OrderTracker from './components/OrderTracker';
+
 import Testimonials from './components/Testimonials';
 import InstagramGallery from './components/InstagramGallery';
 import Newsletter from './components/Newsletter';
@@ -38,6 +38,27 @@ import CheckoutPage from './components/CheckoutPage';
 import ContactPage from './components/ContactPage';
 import FirebaseTestPage from './components/FirebaseTestPage';
 import AdminDashboard from './components/AdminDashboard';
+import CustomerOrdersPage from './components/CustomerOrdersPage';
+import LoginPage from './components/LoginPage';
+import ProfilePage from './components/ProfilePage';
+
+
+// ProtectedRoute wrapper to safeguard pages requiring authentication
+function ProtectedRoute({ children, currentUser, isAuthChecking }) {
+  const location = useLocation();
+  if (isAuthChecking) {
+    return (
+      <div className="text-center animate-fade" style={{ padding: '100px 20px', color: 'var(--primary)' }}>
+        <div className="spinner" style={{ border: '4px solid rgba(0,0,0,0.1)', borderTop: '4px solid var(--primary)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }} />
+        <p>Loading profile...</p>
+      </div>
+    );
+  }
+  if (!currentUser) {
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+  return children;
+}
 
 // Wrapper components for React Router parameters to prevent full app rebuild on param changes
 function CategoryPageWrapper({
@@ -70,7 +91,8 @@ function ProductDetailsPageWrapper({
   onAddToCart,
   onNavigate,
   onAddReview,
-  onQuickView
+  onQuickView,
+  triggerAuthCheck
 }) {
   const { productId } = useParams();
   return (
@@ -83,6 +105,7 @@ function ProductDetailsPageWrapper({
       onNavigate={onNavigate}
       onAddReview={onAddReview}
       onQuickView={onQuickView}
+      triggerAuthCheck={triggerAuthCheck}
     />
   );
 }
@@ -248,13 +271,19 @@ export default function App() {
     } else if (page === 'checkout') {
       navigate('/checkout');
     } else if (page === 'tracking') {
-      navigate('/tracking');
+      navigate('/orders');
     } else if (page === 'contact') {
       navigate('/contact');
     } else if (page === 'wishlist') {
       navigate('/wishlist');
     } else if (page === 'firebase-test') {
       navigate('/firebase-test');
+    } else if (page === 'orders') {
+      navigate('/orders');
+    } else if (page === 'profile') {
+      navigate('/profile');
+    } else if (page === 'login') {
+      navigate('/login');
     } else if (page === 'shop') {
       if (category) {
         let catUrl = category;
@@ -274,13 +303,15 @@ export default function App() {
     if (path === '/' || path === '') return 'home';
     if (path === '/cart') return 'cart';
     if (path === '/checkout') return 'checkout';
-    if (path === '/tracking') return 'tracking';
+    if (path === '/tracking') return 'orders';
     if (path === '/contact') return 'contact';
     if (path === '/wishlist') return 'wishlist';
+    if (path === '/orders') return 'orders';
     if (path === '/firebase-test') return 'firebase-test';
     if (path === '/shop') return 'shop';
     if (path.startsWith('/category/')) return 'category';
     if (path.startsWith('/product/')) return 'product';
+
     return 'home';
   }, [location.pathname]);
 
@@ -291,6 +322,33 @@ export default function App() {
 
   // Authentication States
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const [authPromptMessage, setAuthPromptMessage] = useState('');
+
+  const triggerAuthCheck = (action, message = "Please login to continue shopping.") => {
+    // Check using standard Firebase auth context directly or the synced state
+    if (currentUser || auth.currentUser) {
+      action();
+      return true;
+    }
+    setPendingAction(() => action);
+    setAuthPromptMessage(message);
+    setIsAuthPromptOpen(true);
+    setIsCartOpen(false); // Close the cart drawer
+    return false;
+  };
+
+  // Execute pending action once user becomes authenticated
+  useEffect(() => {
+    if (currentUser && pendingAction) {
+      console.log("Executing pending action after successful login...");
+      pendingAction();
+      setPendingAction(null);
+    }
+  }, [currentUser, pendingAction]);
+
   const [modalMode, setModalMode] = useState('login'); // login | signup
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -375,32 +433,36 @@ export default function App() {
   // Sync with Auth Listener
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (user) => {
-      if (user.isAuthenticated) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            const profileData = userDocSnap.data();
-            console.log("User profile loaded from Firestore");
-            setCurrentUser({
-              ...user,
-              displayName: profileData.fullName || user.displayName,
-              fullName: profileData.fullName,
-              isAdmin: profileData.isAdmin || user.email === 'admin@riza.com',
-              ...profileData
-            });
-          } else {
-            setCurrentUser({
-              ...user,
-              isAdmin: user.email === 'admin@riza.com'
-            });
+      try {
+        if (user.isAuthenticated) {
+          try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              const profileData = userDocSnap.data();
+              console.log("User profile loaded from Firestore");
+              setCurrentUser({
+                ...user,
+                displayName: profileData.fullName || user.displayName,
+                fullName: profileData.fullName,
+                isAdmin: profileData.isAdmin || user.email === 'admin@riza.com',
+                ...profileData
+              });
+            } else {
+              setCurrentUser({
+                ...user,
+                isAdmin: user.email === 'admin@riza.com'
+              });
+            }
+          } catch (error) {
+            console.error("Failed to load user profile from Firestore:", error);
+            setCurrentUser(user);
           }
-        } catch (error) {
-          console.error("Failed to load user profile from Firestore:", error);
-          setCurrentUser(user);
+        } else {
+          setCurrentUser(null);
         }
-      } else {
-        setCurrentUser(null);
+      } finally {
+        setIsAuthChecking(false);
       }
     });
     return () => unsubscribe();
@@ -505,14 +567,16 @@ export default function App() {
 
   // 1. Wishlist Handlers
   const handleWishlistToggle = (product) => {
-    setWishlist(prev => {
-      const exists = prev.find(item => item.id === product.id);
-      if (exists) {
-        return prev.filter(item => item.id !== product.id);
-      } else {
-        return [...prev, product];
-      }
-    });
+    triggerAuthCheck(() => {
+      setWishlist(prev => {
+        const exists = prev.find(item => item.id === product.id);
+        if (exists) {
+          return prev.filter(item => item.id !== product.id);
+        } else {
+          return [...prev, product];
+        }
+      });
+    }, "Please login to continue shopping.");
   };
 
   const isProductWishlisted = (product) => {
@@ -579,19 +643,79 @@ export default function App() {
     );
   };
 
-  const handleClearCart = () => {
-    setCart([]);
+  const handleClearCart = (itemsToKeep) => {
+    if (itemsToKeep && Array.isArray(itemsToKeep)) {
+      setCart(itemsToKeep);
+    } else {
+      setCart([]);
+    }
   };
 
   // 3. Checkout and Orders
   const handlePlaceOrder = async (orderId, orderDetails) => {
+    // Collect shipping address
+    let shippingAddressStr = '';
+    if (orderDetails.shipping) {
+      const { address, city, state, pinCode } = orderDetails.shipping;
+      shippingAddressStr = `${address}, ${city}, ${state} - ${pinCode}`;
+    } else if (orderDetails.shippingInfo) {
+      const { address, city, postalCode } = orderDetails.shippingInfo;
+      shippingAddressStr = `${address}, ${city} - ${postalCode}`;
+    }
+
+    const customerNameVal = orderDetails.customer?.name || orderDetails.shippingInfo?.fullName || 'Guest';
+    const emailVal = orderDetails.customer?.email || orderDetails.shippingInfo?.email || '';
+    const phoneVal = orderDetails.customer?.phone || orderDetails.shippingInfo?.phone || '';
+
+    const itemsVal = (orderDetails.items || []).map(item => ({
+      id: item.id || '',
+      name: item.name || '',
+      selectedSize: item.selectedSize || 'Free Size',
+      selectedColor: item.selectedColor || '',
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+      salePrice: item.salePrice || item.price || 0,
+      images: item.images || []
+    }));
+
+    const subtotalVal = orderDetails.pricing?.subtotal || orderDetails.totals?.subtotal || 0;
+    const shippingChargeVal = orderDetails.pricing?.shipping !== undefined ? orderDetails.pricing.shipping : (orderDetails.totals ? (orderDetails.totals.subtotal >= 1499 ? 0 : 99) : 0);
+    const totalAmountVal = orderDetails.pricing?.total || orderDetails.totals?.grandTotal || 0;
+    const paymentMethodVal = orderDetails.paymentMethod || 'razorpay';
+
+    // Build the exact required Firestore document structure
+    if (!currentUser) {
+      console.error("Refusing to create order for unauthenticated user.");
+      alert("Please sign in to place your order.");
+      return;
+    }
+
+    const finalOrder = {
+      orderId,
+      userId: currentUser.uid,
+      userEmail: currentUser.email,
+      customerName: currentUser.displayName || customerNameVal,
+      email: emailVal || currentUser.email,
+      phone: phoneVal,
+      shippingAddress: shippingAddressStr,
+      items: itemsVal,
+      subtotal: subtotalVal,
+      shippingCharge: shippingChargeVal,
+      totalAmount: totalAmountVal,
+      paymentMethod: paymentMethodVal,
+      paymentStatus: orderDetails.paymentStatus || 'Paid',
+      orderStatus: orderDetails.orderStatus || 'Pending',
+      razorpayPaymentId: orderDetails.razorpayPaymentId || null,
+      createdAt: new Date().toISOString()
+    };
+
     setOrdersList(prev => ({
       ...prev,
-      [orderId]: orderDetails
+      [orderId]: finalOrder
     }));
 
     try {
-      await setDoc(doc(db, 'orders', orderId), orderDetails);
+      await setDoc(doc(db, 'orders', orderId), finalOrder);
       console.log("Order saved to Firestore successfully:", orderId);
     } catch (err) {
       console.error("Failed to save order to Firestore:", err);
@@ -719,6 +843,7 @@ export default function App() {
               onNavigate={handleNavigate}
               onAddReview={handleAddReview}
               onQuickView={setActiveQuickViewProduct}
+              triggerAuthCheck={triggerAuthCheck}
             />
           } />
           
@@ -731,60 +856,69 @@ export default function App() {
               activeCoupon={activeCoupon}
               onApplyCoupon={handleApplyCoupon}
               onRemoveCoupon={handleRemoveCoupon}
+              triggerAuthCheck={triggerAuthCheck}
             />
           } />
           
           <Route path="/checkout" element={
-            <CheckoutPage
-              cart={cart}
-              activeCoupon={activeCoupon}
-              onClearCart={handleClearCart}
-              onPlaceOrder={handlePlaceOrder}
-              onNavigate={handleNavigate}
-            />
+            <ProtectedRoute currentUser={currentUser} isAuthChecking={isAuthChecking}>
+              <CheckoutPage
+                cart={cart}
+                activeCoupon={activeCoupon}
+                onClearCart={handleClearCart}
+                onPlaceOrder={handlePlaceOrder}
+                onNavigate={handleNavigate}
+              />
+            </ProtectedRoute>
           } />
           
           <Route path="/wishlist" element={
-            <div className="page-wishlist section animate-fade">
-              <div className="container">
-                <div className="section-header">
-                  <span className="section-subtitle">Your Closet</span>
-                  <h2 className="section-title">Your Private Wishlist</h2>
-                </div>
+            <ProtectedRoute currentUser={currentUser} isAuthChecking={isAuthChecking}>
+              <div className="page-wishlist section animate-fade">
+                <div className="container">
+                  <div className="section-header">
+                    <span className="section-subtitle">Your Closet</span>
+                    <h2 className="section-title">Your Private Wishlist</h2>
+                  </div>
 
-                {wishlist.length === 0 ? (
-                  <div className="empty-wishlist-state text-center">
-                    <HelpCircle size={64} className="empty-icon" />
-                    <h3>Your Wishlist is Empty</h3>
-                    <p>Save items you love here by clicking the heart button on cards. Revisit them at any time to add to cart.</p>
-                    <button className="btn btn-primary" onClick={() => handleNavigate('shop')}>
-                      Explore Shop Collections
-                    </button>
-                  </div>
-                ) : (
-                  <div className="product-grid">
-                    {wishlist.map(product => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        isWishlisted={true}
-                        onWishlistToggle={handleWishlistToggle}
-                        onAddToCart={handleCardAddToCart}
-                        onQuickView={setActiveQuickViewProduct}
-                      />
-                    ))}
-                  </div>
-                )}
+                  {wishlist.length === 0 ? (
+                    <div className="empty-wishlist-state text-center">
+                      <HelpCircle size={64} className="empty-icon" />
+                      <h3>Your Wishlist is Empty</h3>
+                      <p>Save items you love here by clicking the heart button on cards. Revisit them at any time to add to cart.</p>
+                      <button className="btn btn-primary" onClick={() => handleNavigate('shop')}>
+                        Explore Shop Collections
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="product-grid">
+                      {wishlist.map(product => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          isWishlisted={true}
+                          onWishlistToggle={handleWishlistToggle}
+                          onAddToCart={handleCardAddToCart}
+                          onQuickView={setActiveQuickViewProduct}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </ProtectedRoute>
           } />
           
-          <Route path="/tracking" element={
-            <div className="animate-fade">
-              <OrderTracker ordersList={ordersList} />
-            </div>
+          <Route path="/login" element={
+            <LoginPage currentUser={currentUser} setCurrentUser={setCurrentUser} />
           } />
-          
+
+          <Route path="/profile" element={
+            <ProtectedRoute currentUser={currentUser} isAuthChecking={isAuthChecking}>
+              <ProfilePage currentUser={currentUser} setCurrentUser={setCurrentUser} onNavigate={handleNavigate} />
+            </ProtectedRoute>
+          } />
+
           <Route path="/contact" element={
             <ContactPage onNavigate={handleNavigate} />
           } />
@@ -794,7 +928,17 @@ export default function App() {
           } />
 
           <Route path="/admin" element={
-            <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} />
+            !isLoading && (!currentUser || !currentUser.isAdmin) ? (
+              <Navigate to="/" replace />
+            ) : (
+              <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} />
+            )
+          } />
+
+          <Route path="/orders" element={
+            <ProtectedRoute currentUser={currentUser} isAuthChecking={isAuthChecking}>
+              <CustomerOrdersPage currentUser={currentUser} onNavigate={handleNavigate} />
+            </ProtectedRoute>
           } />
 
           {/* Catch-all route to redirect back to home page */}
@@ -824,8 +968,15 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onCheckout={() => {
-          setIsCartOpen(false);
-          setIsCheckoutOpen(true);
+          triggerAuthCheck(() => {
+            try {
+              localStorage.removeItem('buyNowItem');
+            } catch (err) {
+              console.error(err);
+            }
+            setIsCartOpen(false);
+            setIsCheckoutOpen(true);
+          }, "Please login to continue shopping.");
         }}
         activeCoupon={activeCoupon}
         onApplyCoupon={handleApplyCoupon}
@@ -841,6 +992,7 @@ export default function App() {
         onClearCart={handleClearCart}
         onPlaceOrder={handlePlaceOrder}
         onNavigate={handleNavigate}
+        currentUser={currentUser}
       />
 
       {/* Quick View Details Modal */}
@@ -897,6 +1049,17 @@ export default function App() {
                     <Package size={16} /> Go to Admin Dashboard
                   </button>
                 )}
+
+                <button 
+                  className="btn btn-secondary btn-block" 
+                  style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid var(--primary)', color: 'var(--primary)', background: '#FFF' }}
+                  onClick={() => {
+                    setIsAccountOpen(false);
+                    handleNavigate('orders');
+                  }}
+                >
+                  <ShoppingBag size={16} /> View My Orders
+                </button>
 
                 <button 
                   className="btn btn-secondary btn-block" 
@@ -1090,6 +1253,49 @@ export default function App() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Auth Intercept Prompt Modal */}
+      {isAuthPromptOpen && (
+        <div className="modal-overlay" onClick={() => setIsAuthPromptOpen(false)}>
+          <div className="account-modal-container animate-zoom" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setIsAuthPromptOpen(false)}>
+              <X size={20} />
+            </button>
+            
+            <div className="account-modal-body text-center">
+              <h2 style={{ fontFamily: 'var(--font-headings)', color: 'var(--charcoal)', marginBottom: '16px' }}>Authentication Required</h2>
+              <p className="account-desc" style={{ marginBottom: '24px', fontSize: '1rem', color: 'var(--text-muted)' }}>
+                {authPromptMessage || "Please login to continue shopping."}
+              </p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setIsAuthPromptOpen(false);
+                    const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
+                    navigate(`/login?redirect=${currentPath}`);
+                  }}
+                  style={{ padding: '12px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}
+                >
+                  Login
+                </button>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsAuthPromptOpen(false);
+                    const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
+                    navigate(`/login?mode=register&redirect=${currentPath}`);
+                  }}
+                  style={{ padding: '12px', border: '1px solid var(--border-medium)', background: '#FFF', borderRadius: 'var(--radius-md)', color: 'var(--charcoal)', fontWeight: 600 }}
+                >
+                  Register
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -10,7 +10,8 @@ export default function ProductDetailsPage({
   onAddToCart,
   onNavigate,
   onAddReview,
-  onQuickView
+  onQuickView,
+  triggerAuthCheck
 }) {
   // Find current product
   const product = useMemo(() => {
@@ -108,13 +109,26 @@ export default function ProductDetailsPage({
   };
 
   const handleBuyNowClick = () => {
-    onAddToCart({
-      ...product,
-      selectedSize,
-      selectedColor,
-      quantity
-    });
-    onNavigate('checkout');
+    triggerAuthCheck(() => {
+      const buyNowInfo = {
+        id: product.id,
+        selectedSize,
+        selectedColor,
+        quantity
+      };
+      try {
+        localStorage.setItem('buyNowItem', JSON.stringify(buyNowInfo));
+      } catch (err) {
+        console.error(err);
+      }
+      onAddToCart({
+        ...product,
+        selectedSize,
+        selectedColor,
+        quantity
+      });
+      onNavigate('checkout');
+    }, "Please login to continue shopping.");
   };
 
   const handleReviewSubmit = (e) => {

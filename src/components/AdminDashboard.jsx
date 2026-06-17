@@ -23,7 +23,8 @@ import {
   deleteDoc, 
   updateDoc,
   query,
-  orderBy
+  orderBy,
+  onSnapshot
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -43,6 +44,8 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
   // Search and filter states
   const [productSearch, setProductSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('All');
+
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -97,33 +100,31 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
     }
   };
 
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
-    try {
-      const ordersQuery = query(collection(db, 'orders'));
-      const querySnapshot = await getDocs(ordersQuery);
-      const ordersList = [];
-      querySnapshot.forEach((doc) => {
-        ordersList.push({ id: doc.id, ...doc.data() });
-      });
-      // Sort orders locally by date (latest first)
-      ordersList.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA;
-      });
-      setOrders(ordersList);
-    } catch (err) {
-      console.error("Error fetching orders in dashboard:", err);
-    } finally {
-      setLoadingOrders(false);
-    }
-  };
-
   useEffect(() => {
     if (isAdmin) {
       fetchProducts();
-      fetchOrders();
+      
+      setLoadingOrders(true);
+      const ordersQuery = query(collection(db, 'orders'));
+      const unsubscribe = onSnapshot(ordersQuery, (querySnapshot) => {
+        const ordersList = [];
+        querySnapshot.forEach((doc) => {
+          ordersList.push({ id: doc.id, ...doc.data() });
+        });
+        // Sort orders locally by date (latest first)
+        ordersList.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt) : new Date(a.date || 0);
+          const dateB = b.createdAt ? new Date(b.createdAt) : new Date(b.date || 0);
+          return dateB - dateA;
+        });
+        setOrders(ordersList);
+        setLoadingOrders(false);
+      }, (err) => {
+        console.error("Error listening to orders in admin dashboard:", err);
+        setLoadingOrders(false);
+      });
+
+      return () => unsubscribe();
     }
   }, [isAdmin]);
 
@@ -314,35 +315,12 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
     try {
       const orderRef = doc(db, 'orders', orderId);
       
-      // Add status update timeline entry
-      const timestampString = new Date().toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      
-      // We retrieve the active order to update timeline
-      const targetOrder = orders.find(o => o.orderId === orderId);
-      let updatedTimeline = targetOrder ? [...(targetOrder.timeline || [])] : [];
-      
-      if (newStatus === 'Processing') {
-        updatedTimeline[1] = { label: 'Processing at warehouse', time: `At ${timestampString}`, done: true };
-      } else if (newStatus === 'Shipped') {
-        updatedTimeline[1].done = true;
-        updatedTimeline[2] = { label: 'Dispatched to logistics', time: `At ${timestampString}`, done: true };
-      } else if (newStatus === 'Delivered') {
-        updatedTimeline[1].done = true;
-        updatedTimeline[2].done = true;
-        updatedTimeline[3] = { label: 'Out for Delivery', time: `At ${timestampString}`, done: true };
-        updatedTimeline[4] = { label: 'Delivered', time: `At ${timestampString}`, done: true };
-      }
-
       await updateDoc(orderRef, {
-        status: newStatus,
-        timeline: updatedTimeline
+        orderStatus: newStatus,
+        status: newStatus // Backwards compatibility for older items
       });
       
       console.log(`Order ${orderId} status updated to ${newStatus}`);
-      fetchOrders();
     } catch (err) {
       console.error("Failed to update order status:", err);
       alert("Failed to update order status. Check database permissions.");
@@ -356,11 +334,19 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
     p.category.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  const filteredOrders = orders.filter(o => 
-    o.orderId.toLowerCase().includes(orderSearch.toLowerCase()) ||
-    (o.customer && o.customer.name.toLowerCase().includes(orderSearch.toLowerCase())) ||
-    (o.customer && o.customer.email.toLowerCase().includes(orderSearch.toLowerCase()))
-  );
+  const filteredOrders = orders.filter(o => {
+    const matchesSearch = 
+      o.orderId.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      (o.customerName && o.customerName.toLowerCase().includes(orderSearch.toLowerCase())) ||
+      (o.email && o.email.toLowerCase().includes(orderSearch.toLowerCase())) ||
+      (o.customer && o.customer.name && o.customer.name.toLowerCase().includes(orderSearch.toLowerCase())) ||
+      (o.customer && o.customer.email && o.customer.email.toLowerCase().includes(orderSearch.toLowerCase()));
+
+    const currentStatus = o.orderStatus || o.status || 'Pending';
+    const matchesStatus = orderStatusFilter === 'All' || currentStatus === orderStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   // If user is not authorized, show access denied gateway
   if (!isAdmin) {
@@ -540,15 +526,30 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
         {/* Tab 2: Orders Sub-Pane */}
         {activeTab === 'orders' && (
           <div className="admin-orders-pane animate-fade">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
               <div className="search-input-container" style={{ maxWidth: '360px', width: '100%' }}>
                 <input 
                   type="text" 
                   className="form-input" 
-                  placeholder="Search orders by Order ID, Client name/email..." 
+                  placeholder="Search orders by Order ID, name, email..." 
                   value={orderSearch}
                   onChange={(e) => setOrderSearch(e.target.value)}
                 />
+              </div>
+              <div className="filter-input-container" style={{ maxWidth: '200px', width: '100%' }}>
+                <select
+                  className="form-input"
+                  value={orderStatusFilter}
+                  onChange={(e) => setOrderStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Packed">Packed</option>
+                  <option value="Shipped">Shipped</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
               </div>
             </div>
 
@@ -568,13 +569,15 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
                     <div style={{ background: 'var(--bg-secondary)', padding: '16px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
                         <span style={{ fontWeight: 700, color: 'var(--charcoal)', marginRight: '8px' }}><code>{order.orderId}</code></span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Placed on {order.date}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          Placed on {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN') : order.date}
+                        </span>
                       </div>
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status:</span>
                         <select 
-                          value={order.status || 'Ordered'}
+                          value={order.orderStatus || order.status || 'Pending'}
                           onChange={(e) => handleUpdateOrderStatus(order.orderId, e.target.value)}
                           style={{
                             padding: '6px 12px',
@@ -583,13 +586,15 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
                             fontSize: '0.85rem',
                             fontWeight: 600,
                             background: '#FFF',
-                            color: order.status === 'Delivered' ? '#2E7D32' : order.status === 'Shipped' ? '#1565C0' : 'var(--primary)'
+                            color: (order.orderStatus || order.status) === 'Delivered' ? '#2E7D32' : (order.orderStatus || order.status) === 'Cancelled' ? '#C62828' : 'var(--primary)'
                           }}
                         >
-                          <option value="Ordered">Ordered</option>
-                          <option value="Processing">Processing</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Packed">Packed</option>
                           <option value="Shipped">Shipped</option>
                           <option value="Delivered">Delivered</option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </div>
                     </div>
@@ -600,16 +605,21 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
                       <div>
                         <h4 style={{ fontSize: '0.9rem', color: 'var(--charcoal)', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px', marginBottom: '10px' }}>Billing & Delivery</h4>
                         <div style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--charcoal)' }}>
-                          <div><strong>Name:</strong> {order.customer ? order.customer.name : 'Unknown'}</div>
-                          <div><strong>Email:</strong> {order.customer ? order.customer.email : 'Unknown'}</div>
-                          <div><strong>Phone:</strong> {order.customer ? order.customer.phone : 'Unknown'}</div>
+                          <div><strong>Name:</strong> {order.customerName || order.customer?.name || 'Guest'}</div>
+                          <div><strong>Email:</strong> {order.email || order.customer?.email || 'N/A'}</div>
+                          <div><strong>Phone:</strong> {order.phone || order.customer?.phone || 'N/A'}</div>
                           <div style={{ marginTop: '8px', color: 'var(--text-muted)' }}>
                             <strong>Address:</strong><br />
-                            {order.shipping ? `${order.shipping.address}, ${order.shipping.city}, ${order.shipping.state} - ${order.shipping.pinCode}` : 'No address specified'}
+                            {order.shippingAddress || (order.shipping ? `${order.shipping.address}, ${order.shipping.city}, ${order.shipping.state} - ${order.shipping.pinCode}` : 'N/A')}
                           </div>
                           {order.notes && (
                             <div style={{ marginTop: '8px', background: 'var(--bg-secondary)', padding: '8px', borderRadius: '4px', fontSize: '0.8rem', borderLeft: '3px solid var(--primary)' }}>
                               <strong>Notes:</strong> {order.notes}
+                            </div>
+                          )}
+                          {order.razorpayPaymentId && (
+                            <div style={{ marginTop: '8px', color: 'var(--primary)', fontWeight: 600 }}>
+                              🛡️ Razorpay ID: <code style={{ fontSize: '0.8rem' }}>{order.razorpayPaymentId}</code>
                             </div>
                           )}
                         </div>
@@ -640,7 +650,7 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
                         <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>Subtotal:</span>
-                            <span>₹{order.pricing ? order.pricing.subtotal : 0}</span>
+                            <span>₹{order.subtotal !== undefined ? order.subtotal : (order.pricing ? order.pricing.subtotal : 0)}</span>
                           </div>
                           {order.pricing && order.pricing.discount > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2E7D32' }}>
@@ -649,13 +659,21 @@ export default function AdminDashboard({ currentUser, onNavigate }) {
                             </div>
                           )}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Shipping:</span>
-                            <span>{order.pricing && order.pricing.shipping === 0 ? 'FREE' : `₹${order.pricing ? order.pricing.shipping : 0}`}</span>
+                            <span>Shipping Fee:</span>
+                            <span>
+                              {order.shippingCharge === 0 ? 'FREE' : `₹${order.shippingCharge !== undefined ? order.shippingCharge : (order.pricing ? order.pricing.shipping : 0)}`}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                            <span>Payment Status:</span>
+                            <span style={{ color: order.paymentStatus === 'Paid' ? '#2E7D32' : '#E65100', fontWeight: 600 }}>
+                              {order.paymentStatus || 'Paid'}
+                            </span>
                           </div>
                           <div style={{ height: '1px', background: 'var(--border-light)', margin: '4px 0' }}></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '0.95rem', color: 'var(--charcoal)' }}>
                             <span>Paid Total:</span>
-                            <span>₹{order.pricing ? order.pricing.total : 0}</span>
+                            <span>₹{order.totalAmount !== undefined ? order.totalAmount : (order.pricing ? order.pricing.total : 0)}</span>
                           </div>
                         </div>
                       </div>

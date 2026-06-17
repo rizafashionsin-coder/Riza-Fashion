@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 import { Search, Heart, ShoppingBag, User, Menu, X, Tag } from 'lucide-react';
 
 export default function Navbar({
@@ -12,9 +15,19 @@ export default function Navbar({
   onOpenAccount,
   currentUser
 }) {
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/');
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
 
   // Handle header background opacity change on scroll
   useEffect(() => {
@@ -88,7 +101,7 @@ export default function Navbar({
         </div>
         <div className="navbar-container container">
           {/* Mobile Menu Icon */}
-          <button 
+          <button
             className="navbar-mobile-toggle"
             onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Open Menu"
@@ -118,7 +131,7 @@ export default function Navbar({
           <div className="navbar-actions">
             {/* Search Bar Toggle */}
             <div className="navbar-search-wrapper">
-              <button 
+              <button
                 className="navbar-action-btn"
                 onClick={() => setIsSearchVisible(!isSearchVisible)}
                 aria-label="Toggle Search"
@@ -140,7 +153,7 @@ export default function Navbar({
             </div>
 
             {/* Wishlist Link */}
-            <button 
+            <button
               className="navbar-action-btn badge-container"
               onClick={() => onNavigate('wishlist')}
               aria-label="Wishlist"
@@ -150,7 +163,7 @@ export default function Navbar({
             </button>
 
             {/* Cart Link */}
-            <button 
+            <button
               className="navbar-action-btn badge-container"
               onClick={onOpenCart}
               aria-label="Cart"
@@ -159,20 +172,42 @@ export default function Navbar({
               {cartCount > 0 && <span className="action-badge bg-accent">{cartCount}</span>}
             </button>
 
-            {/* Account Link */}
-            <button 
-              className="navbar-action-btn"
-              onClick={onOpenAccount}
-              aria-label="Account"
-              style={currentUser ? { borderRadius: '20px', padding: '6px 14px', gap: '8px', display: 'flex', alignItems: 'center' } : {}}
-            >
-              <User size={20} />
-              {currentUser && (
-                <span className="navbar-username" style={{ fontSize: '0.85rem', fontWeight: 500, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentUser.email}
-                </span>
-              )}
-            </button>
+            {/* Auth Links */}
+            {currentUser ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
+                <button
+                  className="navbar-link"
+                  onClick={() => navigate('/profile')}
+                  style={{ fontSize: '0.85rem', fontWeight: 500 }}
+                >
+                  Profile
+                </button>
+                <button
+                  className="navbar-link"
+                  onClick={() => navigate('/orders')}
+                  style={{ fontSize: '0.85rem', fontWeight: 500 }}
+                >
+                  Orders
+                </button>
+                <button
+                  className="navbar-link"
+                  onClick={handleLogout}
+                  style={{ fontSize: '0.85rem', fontWeight: 500, color: '#B71C1C' }}
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
+                <button
+                  className="navbar-link"
+                  onClick={() => navigate('/login')}
+                  style={{ fontSize: '0.85rem', fontWeight: 500 }}
+                >
+                  Login
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -187,7 +222,7 @@ export default function Navbar({
               <X size={24} />
             </button>
           </div>
-          
+
           <div className="drawer-search">
             <form onSubmit={handleSearchSubmit}>
               <div className="search-input-container">
@@ -212,6 +247,48 @@ export default function Navbar({
                 {link.label}
               </button>
             ))}
+
+            {/* Mobile Auth Links */}
+            <div style={{ margin: '15px 0', borderTop: '1px solid var(--border-light)' }}></div>
+            {currentUser ? (
+              <>
+                <button
+                  className="drawer-link"
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}
+                >
+                  Profile
+                </button>
+                <button
+                  className="drawer-link"
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/orders'); }}
+                >
+                  Orders
+                </button>
+                <button
+                  className="drawer-link"
+                  onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }}
+                  style={{ color: '#B71C1C' }}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="drawer-link"
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/login'); }}
+                >
+                  Login
+                </button>
+                <button
+                  className="drawer-link"
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/login?mode=register'); }}
+                  style={{ color: 'var(--primary)' }}
+                >
+                  Register
+                </button>
+              </>
+            )}
           </nav>
         </div>
       </div>

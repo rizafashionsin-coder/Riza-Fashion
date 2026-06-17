@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ArrowLeft, ArrowRight, CreditCard, ShieldCheck, CheckCircle2, Copy, Check } from 'lucide-react';
+import { auth } from '../firebase';
 
 export default function CheckoutFlow({
   isOpen,
@@ -24,13 +25,7 @@ export default function CheckoutFlow({
     postalCode: ''
   });
 
-  // Payment fields
-  const [paymentForm, setPaymentForm] = useState({
-    cardName: '',
-    cardNumber: '',
-    expiry: '',
-    cvv: ''
-  });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [isCopied, setIsCopied] = useState(false);
@@ -46,14 +41,11 @@ export default function CheckoutFlow({
   }
 
   const discountAmount = Math.round((subtotal * discountPercentage) / 100);
-  const grandTotal = subtotal - discountAmount + (subtotal - discountAmount >= 1499 ? 0 : 99);
+  const shippingFee = subtotal - discountAmount >= 1499 ? 0 : 99;
+  const grandTotal = subtotal - discountAmount + shippingFee;
 
   const handleShippingChange = (e) => {
     setShippingForm({ ...shippingForm, [e.target.name]: e.target.value });
-  };
-
-  const handlePaymentChange = (e) => {
-    setPaymentForm({ ...paymentForm, [e.target.name]: e.target.value });
   };
 
   const handleNextStep = (e) => {
@@ -63,13 +55,24 @@ export default function CheckoutFlow({
     }
   };
 
-  const handlePlaceOrderSubmit = (e) => {
+  const handlePlaceOrderSubmit = async (e) => {
     e.preventDefault();
+    if (isProcessing) return;
+
+    // Verify user is authenticated before opening Razorpay
+    if (!auth.currentUser) {
+      alert("Please login to complete your payment and order.");
+      setIsProcessing(false);
+      onClose();
+      onNavigate('home');
+      return;
+    }
+
     // Simulate placing order
     const orderId = `RIZA-${Math.floor(1000 + Math.random() * 9000)}`;
     setGeneratedOrderId(orderId);
 
-    const orderDetails = {
+    const baseOrderDetails = {
       orderId,
       date: new Date().toISOString().split('T')[0],
       items: [...cart],
@@ -82,9 +85,66 @@ export default function CheckoutFlow({
       status: 'Ordered' // Timeline: Ordered -> Processing -> Shipped -> Out for Delivery -> Delivered
     };
 
-    onPlaceOrder(orderId, orderDetails);
-    onClearCart();
-    setStep(3);
+    console.log("VITE_RAZORPAY_KEY_ID:", import.meta.env.VITE_RAZORPAY_KEY_ID);
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    if (!razorpayKey) {
+      alert("Payment gateway configuration is missing (Razorpay Key is not configured). Please contact support.");
+      return;
+    }
+    setIsProcessing(true);
+
+    const options = {
+      key: razorpayKey,
+      amount: grandTotal * 100, // paise
+      currency: "INR",
+      name: "Riza Fashions",
+      description: `Payment for Order #${orderId}`,
+      image: "https://riza-fashions-c2d77.web.app/favicon-icon.png",
+      handler: function (response) {
+        const finalDetails = {
+          ...baseOrderDetails,
+          paymentMethod: 'razorpay',
+          paymentStatus: 'Paid',
+          orderStatus: 'Pending',
+          razorpayPaymentId: response.razorpay_payment_id
+        };
+
+        onPlaceOrder(orderId, finalDetails);
+        try {
+          localStorage.setItem('lastPlacedOrderId', orderId);
+        } catch (err) {
+          console.error(err);
+        }
+        onClearCart();
+        setIsProcessing(false);
+        onClose();
+        onNavigate('orders');
+      },
+      prefill: {
+        name: shippingForm.fullName,
+        email: shippingForm.email,
+        contact: shippingForm.phone
+      },
+      theme: {
+        color: "#9C27B0"
+      },
+      modal: {
+        ondismiss: function() {
+          setIsProcessing(false);
+          alert("Payment cancelled.");
+        }
+      }
+    };
+
+    try {
+      console.log('RAZORPAY OPTIONS', options);
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      setIsProcessing(false);
+      console.error("Failed to load Razorpay popup:", err);
+      alert("Could not load Razorpay. Please verify your internet connection.");
+    }
   };
 
   const handleCopyOrderId = () => {
@@ -281,86 +341,48 @@ export default function CheckoutFlow({
                 
                 {/* Form Col */}
                 <div className="payment-fields-wrapper">
-                  <h4 className="checkout-subtitle">Secure Payment</h4>
-                  <div className="secure-badge-row">
-                    <ShieldCheck size={18} className="color-success" />
-                    <span>Your transaction is encrypted and 100% secure.</span>
-                  </div>
+                  <h4 className="checkout-subtitle">Payment Mode</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                    Payments are handled securely via Razorpay. Choose to pay using cards, UPI, or net banking.
+                  </p>
 
-                  <div className="form-group-row">
-                    <div className="form-field">
-                      <label>Name on Card</label>
-                      <input
-                        type="text"
-                        name="cardName"
-                        className="form-input"
-                        placeholder="Jane Doe"
-                        value={paymentForm.cardName}
-                        onChange={handlePaymentChange}
-                        required
-                      />
+                  {/* Razorpay Platform Assurance */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F9F0FA', border: '1px solid #E1BEE7', color: '#6A1B9A', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px' }}>
+                    <ShieldCheck size={20} style={{ flexShrink: 0, color: 'var(--primary)' }} />
+                    <div style={{ textAlign: 'left' }}>
+                      <strong>Razorpay Secure Checkout</strong>
+                      <p style={{ margin: '4px 0 0 0', color: '#7B1FA2', fontSize: '0.8rem' }}>
+                        Guarantees safe payment processing. Card details are never collected or stored on our servers.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-field">
-                      <label>Card Number</label>
-                      <div className="card-input-wrapper">
-                        <input
-                          type="text"
-                          name="cardNumber"
-                          className="form-input card-number-input"
-                          placeholder="4111 2222 3333 4444"
-                          maxLength="19"
-                          value={paymentForm.cardNumber}
-                          onChange={handlePaymentChange}
-                          required
-                        />
-                        <CreditCard size={18} className="card-input-icon" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="form-group-row grid-2-col">
-                    <div className="form-field">
-                      <label>Expiry Date</label>
-                      <input
-                        type="text"
-                        name="expiry"
-                        className="form-input"
-                        placeholder="MM/YY"
-                        maxLength="5"
-                        value={paymentForm.expiry}
-                        onChange={handlePaymentChange}
-                        required
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label>CVV / Security Code</label>
-                      <input
-                        type="password"
-                        name="cvv"
-                        className="form-input"
-                        placeholder="•••"
-                        maxLength="3"
-                        value={paymentForm.cvv}
-                        onChange={handlePaymentChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="checkout-step-footer">
+                  <div className="checkout-step-footer" style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                     <button 
                       type="button" 
                       className="btn btn-secondary btn-back-step"
                       onClick={() => setStep(1)}
+                      disabled={isProcessing}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <ArrowLeft size={16} />
                       Back
                     </button>
-                    <button type="submit" className="btn btn-primary btn-place-order">
-                      Pay ₹{grandTotal} & Place Order
+                    
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={isProcessing}
+                      style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="loading-spinner" style={{ width: '16px', height: '16px', border: '2px solid #FFF', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                          Processing Payment...
+                        </>
+                      ) : (
+                        `Pay Securely with Razorpay (₹${grandTotal})`
+                      )}
                     </button>
                   </div>
                 </div>

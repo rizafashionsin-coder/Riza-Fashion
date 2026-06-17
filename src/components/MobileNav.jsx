@@ -47,8 +47,14 @@ export default function MobileNav({
       </button>
 
       <button 
-        className="mobile-nav-item"
-        onClick={onOpenAccount}
+        className={`mobile-nav-item ${currentPage === 'profile' || currentPage === 'login' ? 'active' : ''}`}
+        onClick={() => {
+          if (currentUser) {
+            onNavigate('profile');
+          } else {
+            onNavigate('login');
+          }
+        }}
       >
         <User size={20} />
         <span>{currentUser ? 'Profile' : 'Account'}</span>

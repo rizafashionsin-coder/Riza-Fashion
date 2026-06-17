@@ -110,7 +110,7 @@ export default function Footer({ onNavigate }) {
         <div className="footer-col">
           <h4>Customer Service</h4>
           <ul className="footer-links-list">
-            <li><button onClick={() => handleLinkClick('tracking')}>Order Tracking</button></li>
+            <li><button onClick={() => handleLinkClick('orders')}>My Orders</button></li>
             <li><button onClick={() => handleLinkClick('contact')}>Contact Us</button></li>
             <li><a href="#returns">Easy 15-Day Returns</a></li>
             <li><a href="#shipping">Shipping & FAQs</a></li>

@@ -8,7 +8,8 @@ export default function CartPage({
   onNavigate,
   activeCoupon,
   onApplyCoupon,
-  onRemoveCoupon
+  onRemoveCoupon,
+  triggerAuthCheck
 }) {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -220,7 +221,16 @@ export default function CartPage({
                 </div>
               </div>
 
-              <button className="btn btn-primary btn-block checkout-proceed-btn" onClick={() => onNavigate('checkout')}>
+              <button className="btn btn-primary btn-block checkout-proceed-btn" onClick={() => {
+                triggerAuthCheck(() => {
+                  try {
+                    localStorage.removeItem('buyNowItem');
+                  } catch (err) {
+                    console.error(err);
+                  }
+                  onNavigate('checkout');
+                }, "Please login to continue shopping.");
+              }}>
                 Proceed to Checkout
               </button>
               

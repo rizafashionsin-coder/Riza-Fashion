@@ -169,6 +169,23 @@ export default function CategoryPage({
         </div>
       </section>
 
+      {/* Category Navigation Bar */}
+      <div className="category-nav-bar-wrapper">
+        <div className="container">
+          <div className="category-nav-scroll-container">
+            {categoriesList.map(cat => (
+              <button
+                key={cat.id}
+                className={`category-nav-item ${categoryName === cat.id ? 'active' : ''}`}
+                onClick={() => onNavigate('shop', cat.id)}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Main Grid Container */}
       <div className="container category-layout-main">
         

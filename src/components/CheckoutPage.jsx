@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { CreditCard, Truck, ShieldCheck, ShoppingBag, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { CreditCard, ShieldCheck, ShoppingBag, ChevronRight } from 'lucide-react';
+import { auth } from '../firebase';
 
 export default function CheckoutPage({
   cart,
@@ -8,6 +9,14 @@ export default function CheckoutPage({
   onPlaceOrder,
   onNavigate
 }) {
+  // Helper keys
+  const getItemKey = (item) => `${item.id}-${item.selectedSize || 'Free Size'}-${item.selectedColor || ''}`;
+  const itemsMatch = (itemA, itemB) => {
+    return itemA.id === itemB.id &&
+           (itemA.selectedSize || 'Free Size') === (itemB.selectedSize || 'Free Size') &&
+           (itemA.selectedColor || '') === (itemB.selectedColor || '');
+  };
+
   // Form states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,11 +27,71 @@ export default function CheckoutPage({
   const [pinCode, setPinCode] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   
-  // Payment option selector
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Prefill authenticated user info
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      if (user.displayName) setName(user.displayName);
+      if (user.email) setEmail(user.email);
+    }
+  }, []);
+
+  // Load Buy Now item if it exists
+  const buyNowInfo = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('buyNowItem');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const isBuyNowMode = !!buyNowInfo;
+
+  // Find matching item in cart
+  const buyNowCartItem = useMemo(() => {
+    if (!buyNowInfo) return null;
+    return cart.find(item => itemsMatch(item, buyNowInfo));
+  }, [cart, buyNowInfo]);
+
+  // Determine optional items in cart
+  const optionalCartItems = useMemo(() => {
+    if (!isBuyNowMode) return [];
+    return cart.filter(item => !buyNowCartItem || !itemsMatch(item, buyNowCartItem));
+  }, [cart, isBuyNowMode, buyNowCartItem]);
+
+  // Track optional items selected state
+  const [selectedOptionalKeys, setSelectedOptionalKeys] = useState({});
+
+  const toggleOptionalItem = (itemKey) => {
+    setSelectedOptionalKeys(prev => ({
+      ...prev,
+      [itemKey]: !prev[itemKey]
+    }));
+  };
+
+  // Derive the active items in the checkout
+  const selectedCheckoutItems = useMemo(() => {
+    if (!isBuyNowMode) return cart;
+    const list = [];
+    if (buyNowCartItem) {
+      list.push(buyNowCartItem);
+    } else if (buyNowInfo) {
+      list.push(buyNowInfo);
+    }
+    optionalCartItems.forEach(item => {
+      const key = getItemKey(item);
+      if (selectedOptionalKeys[key]) {
+        list.push(item);
+      }
+    });
+    return list;
+  }, [cart, isBuyNowMode, buyNowCartItem, buyNowInfo, optionalCartItems, selectedOptionalKeys]);
 
   // Calculations
-  const subtotal = cart.reduce((sum, item) => {
+  const subtotal = selectedCheckoutItems.reduce((sum, item) => {
     const price = item.salePrice || item.price;
     return sum + (price * item.quantity);
   }, 0);
@@ -41,13 +110,22 @@ export default function CheckoutPage({
   const total = subtotal - discount + shippingCost;
 
   // Handle place order submit
-  const handlePlaceOrderSubmit = (e) => {
+  const handlePlaceOrderSubmit = async (e) => {
     e.preventDefault();
-    if (cart.length === 0) return;
+    if (selectedCheckoutItems.length === 0 || isProcessing) return;
+
+    // Verify user is authenticated before opening Razorpay
+    if (!auth.currentUser) {
+      alert("Please login to complete your payment and order.");
+      setIsProcessing(false);
+      onNavigate('home');
+      return;
+    }
 
     // Generate simulated Order ID
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const orderId = `RIZA-${randomNum}`;
+    const payableTotal = total;
 
     const orderDetails = {
       orderId,
@@ -60,8 +138,14 @@ export default function CheckoutPage({
       }),
       customer: { name, email, phone },
       shipping: { address, city, state: stateVal, pinCode },
-      items: [...cart],
-      pricing: { subtotal, discount, coupon: activeCoupon, shipping: shippingCost, total },
+      items: [...selectedCheckoutItems],
+      pricing: { 
+        subtotal, 
+        discount, 
+        coupon: activeCoupon, 
+        shipping: shippingCost, 
+        total: payableTotal 
+      },
       notes: orderNotes,
       status: 'Ordered', // Ordered -> Processing -> Shipped -> Out for Delivery -> Delivered
       timeline: [
@@ -73,21 +157,75 @@ export default function CheckoutPage({
       ]
     };
 
-    // Trigger parent App state handlers
-    onPlaceOrder(orderId, orderDetails);
-    
-    // Clear shopping cart
-    onClearCart();
-    
-    // Redirect to Order Tracker search view, or directly search for this order
-    // Wait! Let's pass orderId to the tracking page redirect
-    onNavigate('tracking');
-    
-    // Push the tracking code directly into the browser storage so the OrderTracker can auto-fill it
+    const clearSelectedItems = () => {
+      const remainingItems = cart.filter(item => !selectedCheckoutItems.some(sel => getItemKey(sel) === getItemKey(item)));
+      onClearCart(remainingItems);
+      // Clean up buyNowItem from localStorage after purchase
+      try {
+        localStorage.removeItem('buyNowItem');
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    console.log("VITE_RAZORPAY_KEY_ID:", import.meta.env.VITE_RAZORPAY_KEY_ID);
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    if (!razorpayKey) {
+      alert("Payment gateway configuration is missing (Razorpay Key is not configured). Please contact support.");
+      return;
+    }
+    setIsProcessing(true);
+
+    const options = {
+      key: razorpayKey,
+      amount: payableTotal * 100, // paise
+      currency: "INR",
+      name: "Riza Fashions",
+      description: `Payment for Order #${orderId}`,
+      image: "https://riza-fashions-c2d77.web.app/favicon-icon.png",
+      handler: function (response) {
+        const finalOrder = {
+          ...orderDetails,
+          paymentMethod: 'razorpay',
+          paymentStatus: 'Paid',
+          orderStatus: 'Pending',
+          razorpayPaymentId: response.razorpay_payment_id
+        };
+
+        onPlaceOrder(orderId, finalOrder);
+        clearSelectedItems();
+        try {
+          localStorage.setItem('lastPlacedOrderId', orderId);
+        } catch (err) {
+          console.error(err);
+        }
+        setIsProcessing(false);
+        onNavigate('orders');
+      },
+      prefill: {
+        name,
+        email,
+        contact: phone
+      },
+      theme: {
+        color: "#9C27B0"
+      },
+      modal: {
+        ondismiss: function() {
+          setIsProcessing(false);
+          alert("Payment cancelled.");
+        }
+      }
+    };
+
     try {
-      localStorage.setItem('lastPlacedOrderId', orderId);
+      console.log('RAZORPAY OPTIONS', options);
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (err) {
-      console.error(err);
+      setIsProcessing(false);
+      console.error("Failed to load Razorpay popup:", err);
+      alert("Could not load Razorpay. Please verify your internet connection.");
     }
   };
 
@@ -125,6 +263,103 @@ export default function CheckoutPage({
         {/* Left: Shipping Forms */}
         <div className="checkout-forms-column">
           
+          {/* Buy Now checkout customization */}
+          {isBuyNowMode && (
+            <div className="checkout-form-card" style={{ borderLeft: '4px solid var(--primary)', background: '#FDFBFD' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
+                <span>📦 Buy Now Purchase Choice</span>
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                You are purchasing this product now. Add additional cart items if desired.
+              </p>
+
+              {/* Selected Locked Product */}
+              <div style={{ marginBottom: '20px' }}>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                  Selected Product (Locked)
+                </span>
+                {buyNowCartItem ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+                    <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
+                    <img src={buyNowCartItem.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>{buyNowCartItem.name}</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Size: {buyNowCartItem.selectedSize} {buyNowCartItem.selectedColor ? `| Color: ${buyNowCartItem.selectedColor}` : ''} • Qty: {buyNowCartItem.quantity}
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                      ₹{(buyNowCartItem.salePrice || buyNowCartItem.price) * buyNowCartItem.quantity}
+                    </span>
+                  </div>
+                ) : buyNowInfo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+                    <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
+                    {buyNowInfo.images && <img src={buyNowInfo.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />}
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>{buyNowInfo.name || 'Buy Now Item'}</strong>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Size: {buyNowInfo.selectedSize} {buyNowInfo.selectedColor ? `| Color: ${buyNowInfo.selectedColor}` : ''} • Qty: {buyNowInfo.quantity}
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                      ₹{(buyNowInfo.salePrice || buyNowInfo.price) * buyNowInfo.quantity}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Optional Cart Items list */}
+              {optionalCartItems.length > 0 && (
+                <div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                    Optional Cart Items (Select to combine)
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {optionalCartItems.map((item, idx) => {
+                      const itemKey = getItemKey(item);
+                      const isChecked = !!selectedOptionalKeys[itemKey];
+                      return (
+                        <label 
+                          key={idx} 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '16px', 
+                            padding: '12px', 
+                            background: isChecked ? 'var(--bg-secondary)' : '#FFF', 
+                            borderRadius: '8px', 
+                            border: isChecked ? '1px solid var(--primary-light)' : '1px solid var(--border-light)', 
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            margin: 0
+                          }}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked} 
+                            onChange={() => toggleOptionalItem(itemKey)} 
+                            style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                          />
+                          <img src={item.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                          <div style={{ flex: 1, textAlign: 'left' }}>
+                            <strong style={{ fontSize: '0.9rem', display: 'block', color: 'var(--charcoal)' }}>{item.name}</strong>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              Size: {item.selectedSize} {item.selectedColor ? `| Color: ${item.selectedColor}` : ''} • Qty: {item.quantity}
+                            </span>
+                          </div>
+                          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--charcoal)' }}>
+                            ₹{(item.salePrice || item.price) * item.quantity}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Customer Details Box */}
           <div className="checkout-form-card">
             <h3>Customer Contact</h3>
@@ -234,60 +469,16 @@ export default function CheckoutPage({
 
           {/* Payment Section */}
           <div className="checkout-form-card">
-            <h3>Payment Method</h3>
-            <p>Select your secure checkout payment channel.</p>
-            
-            <div className="payment-options-list">
-              <label className={`payment-option-card ${paymentMethod === 'card' ? 'active' : ''}`}>
-                <input 
-                  type="radio" 
-                  name="payment" 
-                  checked={paymentMethod === 'card'} 
-                  onChange={() => setPaymentMethod('card')} 
-                />
-                <CreditCard size={18} className="payment-option-icon" />
-                <div className="option-label">
-                  <strong>Credit / Debit Card</strong>
-                  <span>Pay with Visa, Mastercard, RuPay</span>
-                </div>
-              </label>
+            <h3>Payment Mode</h3>
+            <p>Payments are handled securely via Razorpay. Choose to pay using cards, UPI, or net banking.</p>
 
-              <label className={`payment-option-card ${paymentMethod === 'upi' ? 'active' : ''}`}>
-                <input 
-                  type="radio" 
-                  name="payment" 
-                  checked={paymentMethod === 'upi'} 
-                  onChange={() => setPaymentMethod('upi')} 
-                />
-                <Truck size={18} className="payment-option-icon" />
-                <div className="option-label">
-                  <strong>UPI Payment Gateway</strong>
-                  <span>Pay instantly with GPay, PhonePe, Paytm</span>
-                </div>
-              </label>
-
-              <label className={`payment-option-card ${paymentMethod === 'cod' ? 'active' : ''}`}>
-                <input 
-                  type="radio" 
-                  name="payment" 
-                  checked={paymentMethod === 'cod'} 
-                  onChange={() => setPaymentMethod('cod')} 
-                />
-                <Truck size={18} className="payment-option-icon" />
-                <div className="option-label">
-                  <strong>Cash on Delivery (CoD)</strong>
-                  <span>Pay with cash on parcel delivery (Additional ₹50 fee)</span>
-                </div>
-              </label>
-            </div>
-
-            {/* Razorpay Integration Preparation Info */}
-            <div className="razorpay-prep-alert">
-              <ShieldCheck size={20} className="secure-badge-icon" />
-              <div className="alert-content">
-                <strong>Razorpay Payments Platform Ready</strong>
-                <p>
-                  Checkout structure is prepared for live production. API connection endpoints and callback scripts can be integrated here inside the placeOrder handler.
+            {/* Razorpay Platform Assurance */}
+            <div className="razorpay-prep-alert" style={{ background: '#F9F0FA', border: '1px solid #E1BEE7', color: '#6A1B9A', padding: '16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
+              <ShieldCheck size={20} className="secure-badge-icon" style={{ color: '#8E24AA', flexShrink: 0 }} />
+              <div className="alert-content" style={{ textAlign: 'left' }}>
+                <strong style={{ display: 'block', color: '#4A148C' }}>Razorpay Secure Gateway Active</strong>
+                <p style={{ margin: '2px 0 0 0', color: '#7B1FA2', fontSize: '0.8rem' }}>
+                  Guarantees safe payment processing. Card details are never collected or stored on our servers.
                 </p>
               </div>
             </div>
@@ -302,7 +493,7 @@ export default function CheckoutPage({
             
             {/* Scrollable list of items */}
             <div className="checkout-items-list">
-              {cart.map((item, idx) => {
+              {selectedCheckoutItems.map((item, idx) => {
                 const itemPrice = item.salePrice || item.price;
                 return (
                   <div key={idx} className="checkout-item-summary-row">
@@ -339,23 +530,28 @@ export default function CheckoutPage({
                 <span>{shippingCost === 0 ? "FREE" : `₹${shippingCost}`}</span>
               </div>
 
-              {paymentMethod === 'cod' && (
-                <div className="summary-row">
-                  <span>CoD Handling Fee</span>
-                  <span>₹50</span>
-                </div>
-              )}
-
               <div className="summary-divider"></div>
 
               <div className="summary-row total-row">
                 <span>Payable Total</span>
-                <span>₹{total + (paymentMethod === 'cod' ? 50 : 0)}</span>
+                <span>₹{total}</span>
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-block place-order-submit-btn">
-              Securely Place Order
+            <button 
+              type="submit" 
+              className="btn btn-primary btn-block place-order-submit-btn"
+              disabled={isProcessing}
+              style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+            >
+              {isProcessing ? (
+                <>
+                  <div className="loading-spinner" style={{ width: '16px', height: '16px', border: '2px solid #FFF', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                  Processing Payment...
+                </>
+              ) : (
+                `Pay Securely with Razorpay (₹${total})`
+              )}
             </button>
             
             <p className="summary-assurance-text text-center">
