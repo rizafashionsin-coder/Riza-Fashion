@@ -36,8 +36,15 @@ export default function ProductDetailsPage({
   useEffect(() => {
     if (product) {
       setSelectedImageIdx(0);
-      setSelectedSize(product.sizes[0] || 'Free Size');
-      setSelectedColor(product.colors[0] || '');
+      
+      const initialSize = (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size';
+      setSelectedSize(initialSize);
+
+      const initialColor = (product.colors && product.colors.length > 0) 
+        ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
+        : '';
+      setSelectedColor(initialColor);
+      
       setQuantity(1);
       setReviewSubmitted(false);
 
@@ -250,22 +257,27 @@ export default function ProductDetailsPage({
                 <div className="variant-group">
                   <span className="variant-label">Color: <strong>{selectedColor}</strong></span>
                   <div className="variant-bubbles">
-                    {product.colors.map((color, idx) => (
-                      <button
-                        key={idx}
-                        className={`color-bubble-btn ${selectedColor === color ? 'active' : ''}`}
-                        onClick={() => setSelectedColor(color)}
-                        title={color}
-                        style={{
-                          backgroundColor: color.toLowerCase().includes('lavender') ? '#B06BB3' :
-                                           color.toLowerCase().includes('rose') ? '#D8A7B1' :
-                                           color.toLowerCase().includes('white') ? '#FFFFFF' :
-                                           color.toLowerCase().includes('charcoal') ? '#2D2D2D' :
-                                           color.toLowerCase().includes('lilac') ? '#E9D8EF' :
-                                           color.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
-                        }}
-                      />
-                    ))}
+                    {product.colors.map((col, idx) => {
+                      const colorName = typeof col === 'string' ? col : col.name;
+                      const colorCode = typeof col === 'string' ? (
+                        col.toLowerCase().includes('lavender') ? '#B06BB3' :
+                        col.toLowerCase().includes('rose') ? '#D4A5A5' :
+                        col.toLowerCase().includes('white') ? '#FFFFFF' :
+                        col.toLowerCase().includes('charcoal') ? '#2D2D2D' :
+                        col.toLowerCase().includes('lilac') ? '#E9D8EF' :
+                        col.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+                      ) : col.code;
+
+                      return (
+                        <button
+                          key={idx}
+                          className={`color-bubble-btn ${selectedColor === colorName ? 'active' : ''}`}
+                          onClick={() => setSelectedColor(colorName)}
+                          title={colorName}
+                          style={{ backgroundColor: colorCode }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -275,15 +287,20 @@ export default function ProductDetailsPage({
                 <div className="variant-group">
                   <span className="variant-label">Size: <strong>{selectedSize}</strong></span>
                   <div className="variant-sizes">
-                    {product.sizes.map((size, idx) => (
-                      <button
-                        key={idx}
-                        className={`size-badge-btn ${selectedSize === size ? 'active' : ''}`}
-                        onClick={() => setSelectedSize(size)}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {product.sizes.map((size, idx) => {
+                      const isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
+                      return (
+                        <button
+                          key={idx}
+                          className={`size-badge-btn ${selectedSize === size ? 'active' : ''} ${isOutOfStock ? 'disabled' : ''}`}
+                          onClick={() => !isOutOfStock && setSelectedSize(size)}
+                          disabled={isOutOfStock}
+                          style={isOutOfStock ? { opacity: 0.4, textDecoration: 'line-through', cursor: 'not-allowed' } : {}}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

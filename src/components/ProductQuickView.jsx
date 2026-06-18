@@ -29,8 +29,13 @@ export default function ProductQuickView({
   // Reset local selections when product changes
   useEffect(() => {
     setActiveImageIdx(0);
-    setSelectedSize(product.sizes ? product.sizes[0] : 'Free Size');
-    setSelectedColor(product.colors ? product.colors[0] : '');
+    const initialSize = (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size';
+    setSelectedSize(initialSize);
+
+    const initialColor = (product.colors && product.colors.length > 0) 
+      ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
+      : '';
+    setSelectedColor(initialColor);
     setQuantity(1);
     setFormSuccess(false);
     setReviewName('');
@@ -180,30 +185,31 @@ export default function ProductQuickView({
                 <div className="variant-group">
                   <span className="variant-label">Color: <strong>{selectedColor}</strong></span>
                   <div className="color-swatches">
-                    {product.colors.map((color, idx) => (
-                      <button
-                        key={idx}
-                        className={`color-swatch-btn ${selectedColor === color ? 'active' : ''}`}
-                        onClick={() => setSelectedColor(color)}
-                        title={color}
-                      >
-                        {/* Render customized colored dots. Lavender/rose gold default values */}
-                        <span 
-                          className="swatch-color"
-                          style={{
-                            backgroundColor: 
-                              color.includes('Lavender') ? '#B06BB3' :
-                              color.includes('Rose Gold') ? '#D8A7B1' :
-                              color.includes('Lilac') ? '#E9D8EF' :
-                              color.includes('White') ? '#FFFFFF' :
-                              color.includes('Charcoal') ? '#2D2D2D' :
-                              color.includes('Pink') ? '#F2C1D1' :
-                              color.includes('Blue') ? '#A1C6EA' :
-                              color.includes('Wine') ? '#722F37' : '#9F97A8'
-                          }}
-                        ></span>
-                      </button>
-                    ))}
+                    {product.colors.map((col, idx) => {
+                      const colorName = typeof col === 'string' ? col : col.name;
+                      const colorCode = typeof col === 'string' ? (
+                        col.toLowerCase().includes('lavender') ? '#B06BB3' :
+                        col.toLowerCase().includes('rose') ? '#D4A5A5' :
+                        col.toLowerCase().includes('white') ? '#FFFFFF' :
+                        col.toLowerCase().includes('charcoal') ? '#2D2D2D' :
+                        col.toLowerCase().includes('lilac') ? '#E9D8EF' :
+                        col.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+                      ) : col.code;
+
+                      return (
+                        <button
+                          key={idx}
+                          className={`color-swatch-btn ${selectedColor === colorName ? 'active' : ''}`}
+                          onClick={() => setSelectedColor(colorName)}
+                          title={colorName}
+                        >
+                          <span 
+                            className="swatch-color"
+                            style={{ backgroundColor: colorCode }}
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -213,15 +219,20 @@ export default function ProductQuickView({
                 <div className="variant-group">
                   <span className="variant-label">Size: <strong>{selectedSize}</strong></span>
                   <div className="size-pills">
-                    {product.sizes.map((size, idx) => (
-                      <button
-                        key={idx}
-                        className={`size-pill-btn ${selectedSize === size ? 'active' : ''}`}
-                        onClick={() => setSelectedSize(size)}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                    {product.sizes.map((size, idx) => {
+                      const isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
+                      return (
+                        <button
+                          key={idx}
+                          className={`size-pill-btn ${selectedSize === size ? 'active' : ''} ${isOutOfStock ? 'disabled' : ''}`}
+                          onClick={() => !isOutOfStock && setSelectedSize(size)}
+                          disabled={isOutOfStock}
+                          style={isOutOfStock ? { opacity: 0.4, textDecoration: 'line-through', cursor: 'not-allowed' } : {}}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

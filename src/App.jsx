@@ -721,8 +721,10 @@ export default function App() {
   const handleCardAddToCart = (product) => {
     const defaultItem = {
       ...product,
-      selectedSize: product.sizes[0] || 'Free Size',
-      selectedColor: product.colors[0] || '',
+      selectedSize: (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size',
+      selectedColor: (product.colors && product.colors.length > 0) 
+        ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
+        : '',
       quantity: 1
     };
     handleAddToCart(defaultItem);

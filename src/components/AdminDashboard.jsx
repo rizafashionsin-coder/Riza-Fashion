@@ -186,8 +186,11 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [prodPrice, setProdPrice] = useState('');
   const [prodSalePrice, setProdSalePrice] = useState('');
   const [prodDescription, setProdDescription] = useState('');
-  const [prodSizes, setProdSizes] = useState(['Free Size']);
-  const [prodColors, setProdColors] = useState('');
+  const [prodSizes, setProdSizes] = useState([]);
+  const [prodSizeStock, setProdSizeStock] = useState({});
+  const [prodColors, setProdColors] = useState([]);
+  const [colorPickerCode, setColorPickerCode] = useState('#D4A5A5');
+  const [colorInputName, setColorInputName] = useState('');
   const [prodDetails, setProdDetails] = useState('');
   const [prodImages, setProdImages] = useState([]);
   
@@ -212,7 +215,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       ];
 
   // Sizes choices
-  const sizeOptions = ['S', 'M', 'L', 'XL', 'Free Size'];
+  const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
   // Default categories for seeding
   const defaultCategories = [
@@ -561,8 +564,11 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdPrice('');
     setProdSalePrice('');
     setProdDescription('');
-    setProdSizes(['Free Size']);
-    setProdColors('');
+    setProdSizes([]);
+    setProdSizeStock({});
+    setProdColors([]);
+    setColorPickerCode('#D4A5A5');
+    setColorInputName('');
     setProdDetails('');
     setProdImages([]);
     setFormError('');
@@ -578,8 +584,30 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdPrice(product.price || '');
     setProdSalePrice(product.salePrice || '');
     setProdDescription(product.description || '');
-    setProdSizes(product.sizes || ['Free Size']);
-    setProdColors(product.colors ? product.colors.join(', ') : '');
+    setProdSizes(product.sizes || []);
+    setProdSizeStock(product.sizeStock || {});
+    
+    let initialColors = [];
+    if (product.colors && Array.isArray(product.colors)) {
+      initialColors = product.colors.map(c => {
+        if (typeof c === 'string') {
+          return {
+            name: c,
+            code: c.toLowerCase().includes('lavender') ? '#B06BB3' :
+                  c.toLowerCase().includes('rose') ? '#D4A5A5' :
+                  c.toLowerCase().includes('white') ? '#FFFFFF' :
+                  c.toLowerCase().includes('charcoal') ? '#2D2D2D' :
+                  c.toLowerCase().includes('lilac') ? '#E9D8EF' :
+                  c.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+          };
+        }
+        return c;
+      });
+    }
+    setProdColors(initialColors);
+    setColorPickerCode('#D4A5A5');
+    setColorInputName('');
+    
     setProdDetails(product.details ? product.details.join('\n') : '');
     setProdImages(product.images || []);
     setFormError('');
@@ -627,11 +655,48 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const handleSizeToggle = (size) => {
     setProdSizes(prev => {
       if (prev.includes(size)) {
+        setProdSizeStock(stock => {
+          const updated = { ...stock };
+          delete updated[size];
+          return updated;
+        });
         return prev.filter(s => s !== size);
       } else {
+        setProdSizeStock(stock => ({
+          ...stock,
+          [size]: 10
+        }));
         return [...prev, size];
       }
     });
+  };
+
+  // Color addition handler
+  const handleAddColorOption = () => {
+    setFormError('');
+    const name = colorInputName.trim();
+    const code = colorPickerCode.trim();
+    if (!name) {
+      setFormError("Please enter a color name.");
+      return;
+    }
+    const nameExists = prodColors.some(c => c.name.toLowerCase() === name.toLowerCase());
+    const codeExists = prodColors.some(c => c.code.toLowerCase() === code.toLowerCase());
+    if (nameExists) {
+      setFormError(`The color name "${name}" has already been added.`);
+      return;
+    }
+    if (codeExists) {
+      setFormError(`The color code "${code}" has already been added.`);
+      return;
+    }
+    setProdColors(prev => [...prev, { name, code }]);
+    setColorInputName('');
+  };
+
+  // Color removal handler
+  const handleRemoveColorOption = (indexToRemove) => {
+    setProdColors(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   // Submit Product Add/Edit Form
@@ -652,6 +717,14 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError("Please enter a valid sale price.");
       return;
     }
+    if (prodSizes.length === 0) {
+      setFormError("At least one product size is required.");
+      return;
+    }
+    if (prodColors.length === 0) {
+      setFormError("At least one product color is required.");
+      return;
+    }
     if (prodImages.length === 0) {
       setFormError("At least one product image is required.");
       return;
@@ -661,12 +734,15 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     const salePrice = prodSalePrice ? Number(prodSalePrice) : price;
     const discount = Math.round(((price - salePrice) / price) * 100);
 
-    const colorsArray = prodColors 
-      ? prodColors.split(',').map(c => c.trim()).filter(Boolean) 
-      : [];
     const detailsArray = prodDetails 
       ? prodDetails.split('\n').map(d => d.trim()).filter(Boolean) 
       : [];
+
+    const sizeStockObj = {};
+    prodSizes.forEach(sz => {
+      const stockVal = prodSizeStock[sz];
+      sizeStockObj[sz] = stockVal !== undefined && stockVal !== '' ? Number(stockVal) : 10;
+    });
 
     const productPayload = {
       name: prodName,
@@ -676,7 +752,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       discount: discount >= 0 ? discount : 0,
       description: prodDescription,
       sizes: prodSizes,
-      colors: colorsArray,
+      sizeStock: sizeStockObj,
+      colors: prodColors,
       details: detailsArray,
       images: prodImages,
       rating: editingProduct ? (editingProduct.rating || 5.0) : 5.0,
@@ -1097,7 +1174,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                         </td>
                         <td style={{ padding: '16px' }}>
                           <div style={{ fontSize: '0.75rem', color: 'var(--charcoal)' }}>Sizes: {prod.sizes ? prod.sizes.join(', ') : 'None'}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Colors: {prod.colors ? prod.colors.join(', ') : 'None'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Colors: {prod.colors ? (typeof prod.colors[0] === 'string' ? prod.colors.join(', ') : prod.colors.map(c => c.name).join(', ')) : 'None'}</div>
                         </td>
                         <td style={{ padding: '16px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '8px' }}>
@@ -1798,7 +1875,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
                 <div className="form-field">
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Category *</label>
                   <select 
@@ -1813,28 +1890,6 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 </div>
 
                 <div className="form-field">
-                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Product Sizes</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                    {sizeOptions.map(sz => {
-                      const isChecked = prodSizes.includes(sz);
-                      return (
-                        <label key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: isChecked ? 'var(--bg-secondary)' : '#FFF', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked}
-                            onChange={() => handleSizeToggle(sz)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          {sz}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                <div className="form-field">
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Base Price (INR) *</label>
                   <input 
                     type="number" 
@@ -1845,6 +1900,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                     required 
                   />
                 </div>
+
                 <div className="form-field">
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Sale Price (INR - Optional)</label>
                   <input 
@@ -1857,15 +1913,107 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 </div>
               </div>
 
-              <div className="form-field">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Colors (Comma-separated)</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. Lavender Purple, Rose Gold, Pastel Lilac"
-                  value={prodColors}
-                  onChange={(e) => setProdColors(e.target.value)}
-                />
+              {/* Product Variants Section */}
+              <div style={{ border: '1px solid var(--border-light)', padding: '20px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--charcoal)', marginBottom: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Product Variants</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                  {/* Sizes Variant Group */}
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600 }}>Available Sizes *</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {sizeOptions.map(sz => {
+                        const isChecked = prodSizes.includes(sz);
+                        return (
+                          <div key={sz} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: isChecked ? '#FAF7FB' : '#FFF', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border-light)', minWidth: '80px', userSelect: 'none' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => handleSizeToggle(sz)}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              {sz}
+                            </label>
+                            {isChecked && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stock Qty:</span>
+                                <input 
+                                  type="number" 
+                                  min="0" 
+                                  placeholder="10"
+                                  value={prodSizeStock[sz] !== undefined ? prodSizeStock[sz] : 10}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                                    setProdSizeStock(prev => ({ ...prev, [sz]: val }));
+                                  }}
+                                  style={{ width: '60px', padding: '4px 6px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Colors Variant Group */}
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600 }}>Available Colors *</label>
+                    
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                      <input 
+                        type="color" 
+                        value={colorPickerCode}
+                        onChange={(e) => setColorPickerCode(e.target.value)}
+                        style={{ width: '38px', height: '34px', padding: '1px', border: '1px solid var(--border-medium)', borderRadius: '4px', cursor: 'pointer', background: 'none' }}
+                        title="Choose Color"
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Rose Gold"
+                        value={colorInputName}
+                        onChange={(e) => setColorInputName(e.target.value)}
+                        style={{ flex: 1, padding: '6px 10px', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={handleAddColorOption}
+                        className="btn btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600, minWidth: '80px' }}
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '10px', background: '#FFF', minHeight: '80px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>Preview</span>
+                      {prodColors.length === 0 ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontStyle: 'italic' }}>No colors added.</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {prodColors.map((col, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#FAF7FB', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col.code, border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block' }} />
+                                <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--charcoal)' }}>{col.name}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({col.code})</span>
+                              </div>
+                              <button 
+                                type="button" 
+                                onClick={() => handleRemoveColorOption(idx)}
+                                style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                title="Remove"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="form-field">
