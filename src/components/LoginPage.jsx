@@ -10,6 +10,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { User, LogIn, Lock, Mail, ArrowLeft } from 'lucide-react';
+import './LoginPage.css';
 
 export default function LoginPage({ currentUser, setCurrentUser }) {
   const [searchParams] = useSearchParams();
@@ -192,26 +193,26 @@ export default function LoginPage({ currentUser, setCurrentUser }) {
   };
 
   return (
-    <div className="login-page section animate-fade" style={{ background: 'var(--bg-secondary)', minHeight: 'calc(100vh - var(--header-height))', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
-      <div className="login-card-container" style={{ background: '#FFF', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: '850px', display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden', minHeight: '520px' }}>
+    <div className="login-page section animate-fade">
+      <div className="login-card-container">
         
         {/* Left Side: Boutique Aesthetics Imagery & Callout */}
-        <div className="login-image-column" style={{ background: 'linear-gradient(rgba(176, 107, 179, 0.4), rgba(142, 79, 144, 0.7)), url("https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=800&q=80")', backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '40px', color: '#FFF' }}>
-          <div style={{ backdropFilter: 'blur(4px)', background: 'rgba(45, 45, 45, 0.25)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
-            <h3 style={{ fontFamily: 'var(--font-headings)', fontSize: '2rem', color: '#FFF', marginBottom: '10px' }}>Riza Fashions</h3>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#F3EBF7', fontWeight: 300 }}>
+        <div className="login-image-column" style={{ background: 'linear-gradient(rgba(176, 107, 179, 0.4), rgba(142, 79, 144, 0.7)), url("https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=800&q=80")' }}>
+          <div className="login-image-callout">
+            <h3 className="login-image-title">Riza Fashions</h3>
+            <p className="login-image-desc">
               Please sign in to purchase products and track your orders. Discover high-quality boutique designs curated exclusively for you.
             </p>
           </div>
         </div>
 
         {/* Right Side: Form details */}
-        <div className="login-form-column" style={{ padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="login-form-column">
           <div className="account-modal-body">
-            <h2 style={{ fontFamily: 'var(--font-headings)', color: 'var(--charcoal)', marginBottom: '8px', fontSize: '1.75rem', fontWeight: 700 }}>
+            <h2 className="login-form-title">
               {modalMode === 'login' ? 'Welcome Back' : 'Create Account'}
             </h2>
-            <p className="account-desc" style={{ marginBottom: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <p className="login-form-desc">
               {modalMode === 'login' 
                 ? 'Access your private dashboard and closet items.' 
                 : 'Join our premium boutique platform and check out securely.'}
