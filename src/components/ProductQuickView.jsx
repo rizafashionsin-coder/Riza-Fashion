@@ -26,16 +26,54 @@ export default function ProductQuickView({
 
   const modalRef = useRef(null);
 
+  // Filter sizes based on selected color's available sizes
+  const validSizes = React.useMemo(() => {
+    if (!product) return [];
+    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === selectedColor);
+    if (colObj && colObj.sizes) {
+      return product.sizes.filter(sz => colObj.sizes.includes(sz));
+    }
+    return product.sizes || [];
+  }, [product, selectedColor]);
+
+  // Handle color change (image swap + auto-adjust sizes)
+  const handleColorChange = (colorName) => {
+    setSelectedColor(colorName);
+    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === colorName);
+    if (colObj) {
+      // Update image if available
+      if (colObj.imageIndex !== undefined && colObj.imageIndex !== -1 && product.images[colObj.imageIndex]) {
+        setActiveImageIdx(colObj.imageIndex);
+      }
+      // Adjust selected size if it's not valid for the new color
+      const nextValidSizes = colObj.sizes 
+        ? product.sizes.filter(sz => colObj.sizes.includes(sz))
+        : product.sizes || [];
+      if (nextValidSizes.length > 0) {
+        if (!nextValidSizes.includes(selectedSize)) {
+          setSelectedSize(nextValidSizes[0]);
+        }
+      } else {
+        setSelectedSize('');
+      }
+    }
+  };
+
   // Reset local selections when product changes
   useEffect(() => {
     setActiveImageIdx(0);
-    const initialSize = (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size';
-    setSelectedSize(initialSize);
-
     const initialColor = (product.colors && product.colors.length > 0) 
       ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
       : '';
     setSelectedColor(initialColor);
+
+    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === initialColor);
+    const initialValidSizes = (colObj && colObj.sizes)
+      ? product.sizes.filter(sz => colObj.sizes.includes(sz))
+      : product.sizes || [];
+
+    const initialSize = (initialValidSizes && initialValidSizes.length > 0) ? initialValidSizes[0] : 'Free Size';
+    setSelectedSize(initialSize);
     setQuantity(1);
     setFormSuccess(false);
     setReviewName('');
@@ -158,13 +196,20 @@ export default function ProductQuickView({
             </div>
 
             {/* Pricing */}
-            <div className="details-price-row">
-              <span className="details-current-price">₹{product.salePrice || product.price}</span>
+            <div className="details-price-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="details-current-price">₹{product.salePrice || product.price}</span>
+                {product.salePrice && product.salePrice < product.price && (
+                  <>
+                    <span className="details-original-price" style={{ textDecoration: 'line-through', color: 'var(--text-light)' }}>₹{product.price}</span>
+                    <span className="details-discount-pill" style={{ background: 'var(--accent)', color: 'var(--charcoal)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>{product.discount}% OFF</span>
+                  </>
+                )}
+              </div>
               {product.salePrice && product.salePrice < product.price && (
-                <>
-                  <span className="details-original-price">₹{product.price}</span>
-                  <span className="details-discount-pill">{product.discount}% OFF</span>
-                </>
+                <span style={{ fontSize: '0.85rem', color: 'var(--accent-dark)', fontWeight: 600 }}>
+                  Save ₹{product.price - product.salePrice}
+                </span>
               )}
             </div>
 
@@ -200,7 +245,7 @@ export default function ProductQuickView({
                         <button
                           key={idx}
                           className={`color-swatch-btn ${selectedColor === colorName ? 'active' : ''}`}
-                          onClick={() => setSelectedColor(colorName)}
+                          onClick={() => handleColorChange(colorName)}
                           title={colorName}
                         >
                           <span 
@@ -215,11 +260,11 @@ export default function ProductQuickView({
               )}
 
               {/* Size Selection */}
-              {product.sizes && product.sizes.length > 0 && (
+              {validSizes && validSizes.length > 0 && (
                 <div className="variant-group">
                   <span className="variant-label">Size: <strong>{selectedSize}</strong></span>
                   <div className="size-pills">
-                    {product.sizes.map((size, idx) => {
+                    {validSizes.map((size, idx) => {
                       const isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
                       return (
                         <button

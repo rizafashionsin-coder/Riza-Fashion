@@ -32,18 +32,56 @@ export default function ProductDetailsPage({
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
+  // Filter sizes based on selected color's available sizes
+  const validSizes = useMemo(() => {
+    if (!product) return [];
+    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === selectedColor);
+    if (colObj && colObj.sizes) {
+      return product.sizes.filter(sz => colObj.sizes.includes(sz));
+    }
+    return product.sizes || [];
+  }, [product, selectedColor]);
+
+  // Handle color change (image swap + auto-adjust sizes)
+  const handleColorChange = (colorName) => {
+    setSelectedColor(colorName);
+    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === colorName);
+    if (colObj) {
+      // Update image if available
+      if (colObj.imageIndex !== undefined && colObj.imageIndex !== -1 && product.images[colObj.imageIndex]) {
+        setSelectedImageIdx(colObj.imageIndex);
+      }
+      // Adjust selected size if it's not valid for the new color
+      const nextValidSizes = colObj.sizes 
+        ? product.sizes.filter(sz => colObj.sizes.includes(sz))
+        : product.sizes || [];
+      if (nextValidSizes.length > 0) {
+        if (!nextValidSizes.includes(selectedSize)) {
+          setSelectedSize(nextValidSizes[0]);
+        }
+      } else {
+        setSelectedSize('');
+      }
+    }
+  };
+
   // Set default selections
   useEffect(() => {
     if (product) {
       setSelectedImageIdx(0);
       
-      const initialSize = (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size';
-      setSelectedSize(initialSize);
-
       const initialColor = (product.colors && product.colors.length > 0) 
         ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
         : '';
       setSelectedColor(initialColor);
+
+      const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === initialColor);
+      const initialValidSizes = (colObj && colObj.sizes)
+        ? product.sizes.filter(sz => colObj.sizes.includes(sz))
+        : product.sizes || [];
+      
+      const initialSize = (initialValidSizes && initialValidSizes.length > 0) ? initialValidSizes[0] : 'Free Size';
+      setSelectedSize(initialSize);
       
       setQuantity(1);
       setReviewSubmitted(false);
@@ -272,7 +310,7 @@ export default function ProductDetailsPage({
                         <button
                           key={idx}
                           className={`color-bubble-btn ${selectedColor === colorName ? 'active' : ''}`}
-                          onClick={() => setSelectedColor(colorName)}
+                          onClick={() => handleColorChange(colorName)}
                           title={colorName}
                           style={{ backgroundColor: colorCode }}
                         />
@@ -283,11 +321,11 @@ export default function ProductDetailsPage({
               )}
 
               {/* Sizes */}
-              {product.sizes && product.sizes.length > 0 && (
+              {validSizes && validSizes.length > 0 && (
                 <div className="variant-group">
                   <span className="variant-label">Size: <strong>{selectedSize}</strong></span>
                   <div className="variant-sizes">
-                    {product.sizes.map((size, idx) => {
+                    {validSizes.map((size, idx) => {
                       const isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
                       return (
                         <button

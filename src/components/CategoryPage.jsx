@@ -122,9 +122,14 @@ export default function CategoryPage({
       list = list.filter(p => p.discount > 0);
     }
 
-    // Availability Filter (Mock: all items are in stock, but simulate)
+    // Availability Filter
     if (filterInStock) {
-      list = list.filter(p => p.id !== 'out-of-stock-mock'); // simulate check
+      list = list.filter(p => {
+        if (p.sizeStock) {
+          return Object.values(p.sizeStock).some(stock => stock > 0);
+        }
+        return p.stock !== 0;
+      });
     }
 
     // Sort Logic

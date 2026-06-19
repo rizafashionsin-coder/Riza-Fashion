@@ -41,6 +41,7 @@ import AdminDashboard from './components/AdminDashboard';
 import CustomerOrdersPage from './components/CustomerOrdersPage';
 import LoginPage from './components/LoginPage';
 import ProfilePage from './components/ProfilePage';
+import StaticPage from './components/StaticPage';
 
 
 // ProtectedRoute wrapper to safeguard pages requiring authentication
@@ -287,6 +288,16 @@ export default function App() {
       navigate('/profile');
     } else if (page === 'login') {
       navigate('/login');
+    } else if (page === 'about') {
+      navigate('/about');
+    } else if (page === 'privacy-policy') {
+      navigate('/privacy-policy');
+    } else if (page === 'terms-conditions') {
+      navigate('/terms-conditions');
+    } else if (page === 'refund-policy') {
+      navigate('/refund-policy');
+    } else if (page === 'shipping-policy') {
+      navigate('/shipping-policy');
     } else if (page === 'shop') {
       if (category) {
         let catUrl = category;
@@ -314,6 +325,11 @@ export default function App() {
     if (path === '/shop') return 'shop';
     if (path.startsWith('/category/')) return 'category';
     if (path.startsWith('/product/')) return 'product';
+    if (path === '/about') return 'about';
+    if (path === '/privacy-policy') return 'privacy-policy';
+    if (path === '/terms-conditions') return 'terms-conditions';
+    if (path === '/refund-policy') return 'refund-policy';
+    if (path === '/shipping-policy') return 'shipping-policy';
 
     return 'home';
   }, [location.pathname]);
@@ -475,6 +491,78 @@ export default function App() {
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState([]);
   const [deliverySettings, setDeliverySettings] = useState(null);
+  const [websiteSettings, setWebsiteSettings] = useState({
+    contact: {
+      businessName: "Riza Fashions",
+      businessEmail: "care@rizafashions.com",
+      customerSupportEmail: "support@rizafashions.com",
+      mobileNumber: "+91 98765 43210",
+      whatsAppNumber: "919876543210",
+      businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
+      instagramLink: "https://instagram.com",
+      facebookLink: "https://facebook.com",
+      youtubeLink: "https://youtube.com"
+    },
+    aboutUs: { content: "" },
+    privacyPolicy: { content: "" },
+    termsConditions: { content: "" },
+    refundPolicy: { content: "" },
+    shippingPolicy: { content: "" }
+  });
+
+  // Fetch website settings & policies from Firestore and auto-seed if empty or missing
+  useEffect(() => {
+    const websiteSettingsCol = collection(db, 'websiteSettings');
+    const unsubscribe = onSnapshot(websiteSettingsCol, async (snapshot) => {
+      const defaults = {
+        contact: {
+          businessName: "Riza Fashions",
+          businessEmail: "care@rizafashions.com",
+          customerSupportEmail: "support@rizafashions.com",
+          mobileNumber: "+91 98765 43210",
+          whatsAppNumber: "919876543210",
+          businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
+          instagramLink: "https://instagram.com",
+          facebookLink: "https://facebook.com",
+          youtubeLink: "https://youtube.com"
+        },
+        aboutUs: { content: "Elegance crafted for every woman. We design premium garments using the finest fabrics, detailed embroidery, and contemporary cuts to celebrate your unique identity. Riza Fashions was founded on the principle of bringing luxurious traditional and modern styles to every woman's wardrobe." },
+        privacyPolicy: { content: "Your privacy is important to us. This Privacy Policy describes how Riza Fashions collects, uses, and shares your personal information when you visit or make a purchase from our website. We secure your personal information and transaction details through encrypted gateways." },
+        termsConditions: { content: "Welcome to Riza Fashions. These Terms & Conditions outline the rules and regulations for the use of Riza Fashions' Website. By accessing this website, we assume you accept these terms and conditions in full. Do not continue to use Riza Fashions' website if you do not accept all of the terms and conditions stated on this page." },
+        refundPolicy: { content: "We offer a 15-day return and exchange policy on all unused garments. To be eligible for a return, your item must be in the same condition that you received it, unworn or unused, with tags, and in its original packaging. Refund replacements or wallet credits are processed immediately upon inspection." },
+        shippingPolicy: { content: "We provide free express logistics to your doorstep on orders exceeding ₹1499. Orders below the threshold are subject to shipping charges depending on your delivery address. Orders are processed within 1-2 business days and typically delivered within 3-5 business days across India." }
+      };
+
+      const settingsData = {};
+      snapshot.forEach(docSnap => {
+        settingsData[docSnap.id] = docSnap.data();
+      });
+
+      // Check if any default settings are missing in Firestore, and seed them
+      let missingSeeded = false;
+      for (const [key, value] of Object.entries(defaults)) {
+        if (!settingsData[key]) {
+          console.log(`Seeding missing websiteSettings document: ${key}`);
+          try {
+            await setDoc(doc(db, 'websiteSettings', key), value);
+            missingSeeded = true;
+          } catch (e) {
+            console.error(`Failed to seed ${key}:`, e);
+          }
+        }
+      }
+
+      if (!missingSeeded) {
+        setWebsiteSettings(prev => ({
+          ...prev,
+          ...settingsData
+        }));
+      }
+    }, (err) => {
+      console.error("Error listening to websiteSettings:", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Fetch delivery settings from Firestore and auto-seed defaults if missing
   useEffect(() => {
@@ -581,34 +669,33 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync products list with Firestore and auto-seed if empty
+  // Sync products list with Firestore and auto-seed if empty (real-time updates)
   useEffect(() => {
-    const loadAndSeedProducts = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        const fetchedProds = [];
-        querySnapshot.forEach((doc) => {
-          fetchedProds.push({ id: doc.id, ...doc.data() });
-        });
+    const productsQuery = collection(db, 'products');
+    const unsubscribe = onSnapshot(productsQuery, async (querySnapshot) => {
+      const fetchedProds = [];
+      querySnapshot.forEach((docSnap) => {
+        fetchedProds.push({ id: docSnap.id, ...docSnap.data() });
+      });
 
-        if (fetchedProds.length === 0) {
-          console.log("Firestore products collection is empty. Seeding defaults...");
+      if (fetchedProds.length === 0) {
+        console.log("Firestore products collection is empty. Seeding defaults...");
+        try {
           for (const item of initialProducts) {
             await setDoc(doc(db, 'products', item.id), item);
           }
           console.log("Seeding complete!");
-          setProducts(initialProducts);
-        } else {
-          console.log("Loaded products from Firestore:", fetchedProds.length);
-          setProducts(fetchedProds);
+        } catch (e) {
+          console.error("Failed to seed default products:", e);
         }
-      } catch (err) {
-        console.error("Failed to load products from Firestore, falling back to static mock data:", err);
-        setProducts(initialProducts);
+      } else {
+        console.log("Real-time synced products count:", fetchedProds.length);
+        setProducts(fetchedProds);
       }
-    };
-
-    loadAndSeedProducts();
+    }, (err) => {
+      console.error("Error listening to products collection:", err);
+    });
+    return () => unsubscribe();
   }, []);
 
   const [cart, setCart] = useState(() => {
@@ -1011,6 +1098,7 @@ export default function App() {
           onOpenAccount={() => setIsAccountOpen(true)}
           currentUser={currentUser}
           categories={categories}
+          settings={websiteSettings.contact}
         />
       )}
 
@@ -1141,7 +1229,27 @@ export default function App() {
           } />
 
           <Route path="/contact" element={
-            <ContactPage onNavigate={handleNavigate} />
+            <ContactPage onNavigate={handleNavigate} settings={websiteSettings.contact} />
+          } />
+
+          <Route path="/about" element={
+            <StaticPage pageId="aboutUs" title="About Us" onNavigate={handleNavigate} />
+          } />
+          
+          <Route path="/privacy-policy" element={
+            <StaticPage pageId="privacyPolicy" title="Privacy Policy" onNavigate={handleNavigate} />
+          } />
+
+          <Route path="/terms-conditions" element={
+            <StaticPage pageId="termsConditions" title="Terms & Conditions" onNavigate={handleNavigate} />
+          } />
+
+          <Route path="/refund-policy" element={
+            <StaticPage pageId="refundPolicy" title="Refund & Cancellation Policy" onNavigate={handleNavigate} />
+          } />
+
+          <Route path="/shipping-policy" element={
+            <StaticPage pageId="shippingPolicy" title="Shipping & Delivery Policy" onNavigate={handleNavigate} />
           } />
 
           <Route path="/firebase-test" element={
@@ -1168,7 +1276,7 @@ export default function App() {
       </main>
 
       {/* Global Sticky Footer */}
-      {!isAdminRoute && <Footer onNavigate={handleNavigate} />}
+      {!isAdminRoute && <Footer onNavigate={handleNavigate} settings={websiteSettings.contact} />}
 
       {/* Mobile Sticky Action Nav */}
       {!isAdminRoute && (

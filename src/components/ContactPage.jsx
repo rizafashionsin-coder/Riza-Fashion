@@ -1,7 +1,19 @@
 import React, { useState } from 'react';
 import { Phone, MessageSquare, MapPin, ChevronRight, Check } from 'lucide-react';
 
-export default function ContactPage({ onNavigate }) {
+export default function ContactPage({ onNavigate, settings }) {
+  const contact = settings || {
+    businessName: "Riza Fashions",
+    businessEmail: "care@rizafashions.com",
+    customerSupportEmail: "support@rizafashions.com",
+    mobileNumber: "+91 98765 43210",
+    whatsAppNumber: "919876543210",
+    businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
+    instagramLink: "https://instagram.com",
+    facebookLink: "https://facebook.com",
+    youtubeLink: "https://youtube.com"
+  };
+
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -116,27 +128,33 @@ export default function ContactPage({ onNavigate }) {
             <div className="summary-card" style={{ marginBottom: '24px' }}>
               <h3 className="summary-card-title" style={{ marginBottom: '20px' }}>Direct Support</h3>
               <ul className="channel-links" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <li style={{ display: 'flex', gap: '16px' }}>
-                  <Phone className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Stylist Helpline</strong>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>+91 98765 43210 (10:00 AM - 7:00 PM IST)</p>
-                  </div>
-                </li>
-                <li style={{ display: 'flex', gap: '16px' }}>
-                  <MessageSquare className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Email Enquiries</strong>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>care@rizafashions.com</p>
-                  </div>
-                </li>
-                <li style={{ display: 'flex', gap: '16px' }}>
-                  <MapPin className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Flagship Boutique</strong>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>102, Lavender Boulevard, Fashion District, Mumbai, 400001</p>
-                  </div>
-                </li>
+                {contact.mobileNumber && (
+                  <li style={{ display: 'flex', gap: '16px' }}>
+                    <Phone className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Stylist Helpline</strong>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{contact.mobileNumber} (10:00 AM - 7:00 PM IST)</p>
+                    </div>
+                  </li>
+                )}
+                {contact.businessEmail && (
+                  <li style={{ display: 'flex', gap: '16px' }}>
+                    <MessageSquare className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Email Enquiries</strong>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{contact.businessEmail}</p>
+                    </div>
+                  </li>
+                )}
+                {contact.businessAddress && (
+                  <li style={{ display: 'flex', gap: '16px' }}>
+                    <MapPin className="channel-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <div>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--charcoal)' }}>Flagship Boutique</strong>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{contact.businessAddress}</p>
+                    </div>
+                  </li>
+                )}
               </ul>
             </div>
 
@@ -157,16 +175,18 @@ export default function ContactPage({ onNavigate }) {
             </div>
 
             {/* WhatsApp Chat CTA */}
-            <a 
-              href="https://wa.me/919876543210" 
-              target="_blank" 
-              rel="noreferrer" 
-              className="btn btn-accent btn-block"
-              style={{ display: 'flex', gap: '10px', padding: '16px 0', justifyContent: 'center' }}
-            >
-              <MessageSquare size={18} />
-              <span>Chat on WhatsApp</span>
-            </a>
+            {contact.whatsAppNumber && (
+              <a 
+                href={`https://wa.me/${contact.whatsAppNumber.replace(/[^0-9]/g, '')}`}
+                target="_blank" 
+                rel="noreferrer" 
+                className="btn btn-accent btn-block"
+                style={{ display: 'flex', gap: '10px', padding: '16px 0', justifyContent: 'center' }}
+              >
+                <MessageSquare size={18} />
+                <span>Chat on WhatsApp</span>
+              </a>
+            )}
 
           </aside>
 

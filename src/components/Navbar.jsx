@@ -14,7 +14,8 @@ export default function Navbar({
   onOpenCart,
   onOpenAccount,
   currentUser,
-  categories
+  categories,
+  settings
 }) {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -254,6 +255,14 @@ export default function Navbar({
                 {link.label}
               </button>
             ))}
+            {/* Dynamic Policy Pages in Mobile Menu */}
+            <div style={{ margin: '15px 0 5px 0', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Company & Policies</div>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('about'); }}>About Us</button>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('contact'); }}>Contact Us</button>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('shipping-policy'); }}>Shipping Policy</button>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('refund-policy'); }}>Refund Policy</button>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('terms-conditions'); }}>Terms & Conditions</button>
+            <button className="drawer-link" onClick={() => { setIsMobileMenuOpen(false); onNavigate('privacy-policy'); }}>Privacy Policy</button>
 
             {/* Mobile Auth Links */}
             <div style={{ margin: '15px 0', borderTop: '1px solid var(--border-light)' }}></div>

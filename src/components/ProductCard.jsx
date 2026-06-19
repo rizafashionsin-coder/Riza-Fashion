@@ -72,11 +72,18 @@ export default function ProductCard({
 
         <h3 className="product-name">{name}</h3>
         
-        <div className="product-price-row">
-          <div className="prices-wrapper">
-            <span className="current-price">₹{salePrice || price}</span>
+        <div className="product-price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '8px' }}>
+          <div className="prices-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="current-price" style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--charcoal)' }}>₹{salePrice || price}</span>
+              {salePrice && salePrice < price && (
+                <span className="original-price" style={{ textDecoration: 'line-through', fontSize: '0.8rem', color: 'var(--text-light)' }}>₹{price}</span>
+              )}
+            </div>
             {salePrice && salePrice < price && (
-              <span className="original-price">₹{price}</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--accent-dark)', fontWeight: 600 }}>
+                Save ₹{price - salePrice} ({discount}% OFF)
+              </span>
             )}
           </div>
 
@@ -84,6 +91,7 @@ export default function ProductCard({
             className="product-add-cart-btn" 
             onClick={handleAddToCartClick}
             title="Add to Cart"
+            style={{ flexShrink: 0 }}
           >
             <ShoppingCart size={16} />
             <span>Add</span>

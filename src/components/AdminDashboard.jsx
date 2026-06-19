@@ -193,6 +193,27 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [colorInputName, setColorInputName] = useState('');
   const [prodDetails, setProdDetails] = useState('');
   const [prodImages, setProdImages] = useState([]);
+  const [prodStock, setProdStock] = useState(100);
+  const [prodFeatured, setProdFeatured] = useState(false);
+  const [prodLimited, setProdLimited] = useState(false);
+
+  // Form states for Website Settings & Policies
+  const [wsBusinessName, setWsBusinessName] = useState('');
+  const [wsBusinessEmail, setWsBusinessEmail] = useState('');
+  const [wsCustomerSupportEmail, setWsCustomerSupportEmail] = useState('');
+  const [wsMobileNumber, setWsMobileNumber] = useState('');
+  const [wsWhatsAppNumber, setWsWhatsAppNumber] = useState('');
+  const [wsBusinessAddress, setWsBusinessAddress] = useState('');
+  const [wsInstagramLink, setWsInstagramLink] = useState('');
+  const [wsFacebookLink, setWsFacebookLink] = useState('');
+  const [wsYouTubeLink, setWsYouTubeLink] = useState('');
+  
+  const [selectedPolicy, setSelectedPolicy] = useState('aboutUs');
+  const [policyContent, setPolicyContent] = useState('');
+  const [policiesMap, setPoliciesMap] = useState({});
+  const [savingWebsiteSettings, setSavingWebsiteSettings] = useState(false);
+  const [wsSuccess, setWsSuccess] = useState('');
+  const [wsError, setWsError] = useState('');
   
   // Image uploading states
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -227,7 +248,95 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     { id: 'accessories', name: 'Accessories', description: 'Luxury handbags & pendant sets', offer: 'Rose Gold Plated', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80' }
   ];
 
-  // Local category fetching and seeding logic removed. Categories list is now real-time synced and passed down via props.
+  // Load Website Settings & Policies from Firestore
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const unsubscribe = onSnapshot(collection(db, 'websiteSettings'), (snapshot) => {
+      const pMap = {};
+      snapshot.forEach(docSnap => {
+        const id = docSnap.id;
+        const data = docSnap.data();
+        if (id === 'contact') {
+          setWsBusinessName(data.businessName || '');
+          setWsBusinessEmail(data.businessEmail || '');
+          setWsCustomerSupportEmail(data.customerSupportEmail || '');
+          setWsMobileNumber(data.mobileNumber || '');
+          setWsWhatsAppNumber(data.whatsAppNumber || '');
+          setWsBusinessAddress(data.businessAddress || '');
+          setWsInstagramLink(data.instagramLink || '');
+          setWsFacebookLink(data.facebookLink || '');
+          setWsYouTubeLink(data.youtubeLink || '');
+        } else {
+          pMap[id] = data.content || '';
+        }
+      });
+      setPoliciesMap(pMap);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin]);
+
+  // Sync policy textarea when selected policy tab changes
+  useEffect(() => {
+    if (policiesMap[selectedPolicy] !== undefined) {
+      setPolicyContent(policiesMap[selectedPolicy]);
+    } else {
+      setPolicyContent('');
+    }
+  }, [selectedPolicy, policiesMap]);
+
+  // Save Website Contact Details
+  const handleSaveContactInfo = async (e) => {
+    e.preventDefault();
+    setSavingWebsiteSettings(true);
+    setWsSuccess('');
+    setWsError('');
+
+    try {
+      const contactDocRef = doc(db, 'websiteSettings', 'contact');
+      await setDoc(contactDocRef, {
+        businessName: wsBusinessName,
+        businessEmail: wsBusinessEmail,
+        customerSupportEmail: wsCustomerSupportEmail,
+        mobileNumber: wsMobileNumber,
+        whatsAppNumber: wsWhatsAppNumber,
+        businessAddress: wsBusinessAddress,
+        instagramLink: wsInstagramLink,
+        facebookLink: wsFacebookLink,
+        youtubeLink: wsYouTubeLink
+      });
+      setWsSuccess("Contact settings updated successfully!");
+      setTimeout(() => setWsSuccess(''), 4000);
+    } catch (err) {
+      console.error("Failed to save contact info:", err);
+      setWsError("Failed to save contact info. Check permissions.");
+    } finally {
+      setSavingWebsiteSettings(false);
+    }
+  };
+
+  // Save Policy Page Content
+  const handleSavePolicyContent = async (e) => {
+    e.preventDefault();
+    setSavingWebsiteSettings(true);
+    setWsSuccess('');
+    setWsError('');
+
+    try {
+      const policyDocRef = doc(db, 'websiteSettings', selectedPolicy);
+      await setDoc(policyDocRef, {
+        content: policyContent
+      });
+      setWsSuccess("Policy content updated successfully!");
+      setTimeout(() => setWsSuccess(''), 4000);
+    } catch (err) {
+      console.error(`Failed to save policy content for ${selectedPolicy}:`, err);
+      setWsError("Failed to save policy content. Check permissions.");
+    } finally {
+      setSavingWebsiteSettings(false);
+    }
+  };
 
   // Fetch products and orders
   const fetchProducts = async () => {
@@ -571,6 +680,9 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setColorInputName('');
     setProdDetails('');
     setProdImages([]);
+    setProdStock(100);
+    setProdFeatured(false);
+    setProdLimited(false);
     setFormError('');
     setFormSuccess('');
     setIsProductModalOpen(true);
@@ -586,6 +698,9 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdDescription(product.description || '');
     setProdSizes(product.sizes || []);
     setProdSizeStock(product.sizeStock || {});
+    setProdStock(product.stock !== undefined ? product.stock : 100);
+    setProdFeatured(product.isFeatured || false);
+    setProdLimited(product.isLimited || false);
     
     let initialColors = [];
     if (product.colors && Array.isArray(product.colors)) {
@@ -598,10 +713,17 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                   c.toLowerCase().includes('white') ? '#FFFFFF' :
                   c.toLowerCase().includes('charcoal') ? '#2D2D2D' :
                   c.toLowerCase().includes('lilac') ? '#E9D8EF' :
-                  c.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+                  c.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5',
+            imageIndex: -1,
+            sizes: product.sizes || []
           };
         }
-        return c;
+        return {
+          name: c.name,
+          code: c.code,
+          imageIndex: c.imageIndex !== undefined ? c.imageIndex : -1,
+          sizes: c.sizes || product.sizes || []
+        };
       });
     }
     setProdColors(initialColors);
@@ -690,7 +812,12 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError(`The color code "${code}" has already been added.`);
       return;
     }
-    setProdColors(prev => [...prev, { name, code }]);
+    setProdColors(prev => [...prev, { 
+      name, 
+      code,
+      imageIndex: -1,
+      sizes: [...prodSizes]
+    }]);
     setColorInputName('');
   };
 
@@ -759,7 +886,9 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       rating: editingProduct ? (editingProduct.rating || 5.0) : 5.0,
       reviews: editingProduct ? (editingProduct.reviews || []) : [],
       isNew: editingProduct ? (editingProduct.isNew || false) : true,
-      isFeatured: editingProduct ? (editingProduct.isFeatured || false) : false
+      isFeatured: prodFeatured,
+      isLimited: prodLimited,
+      stock: Number(prodStock)
     };
 
     try {
@@ -1088,6 +1217,16 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
             <span className="sidebar-link-content">
               <Settings size={18} />
               <span>Delivery Settings</span>
+            </span>
+          </button>
+
+          <button 
+            onClick={() => { setActiveTab('websiteSettings'); setIsMobileSidebarOpen(false); }}
+            className={`sidebar-link ${activeTab === 'websiteSettings' ? 'active' : ''}`}
+          >
+            <span className="sidebar-link-content">
+              <FileText size={18} />
+              <span>Website Settings</span>
             </span>
           </button>
         </nav>
@@ -1812,6 +1951,201 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
             )}
           </div>
         )}
+
+        {/* Tab 6: Website Settings Pane */}
+        {activeTab === 'websiteSettings' && (
+          <div className="admin-settings-pane animate-fade">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: '1.8rem', margin: 0, color: 'var(--charcoal)' }}>Website Settings</h2>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configure contact information, social links, and policy page contents dynamically.</p>
+              </div>
+            </div>
+
+            {wsSuccess && (
+              <div style={{ background: '#F4FAF6', border: '1px solid #C8E6C9', color: '#2E7D32', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px', fontWeight: 500 }}>
+                {wsSuccess}
+              </div>
+            )}
+
+            {wsError && (
+              <div style={{ background: '#FFF8F8', border: '1px solid #FFCDD2', color: '#B71C1C', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px', fontWeight: 500 }}>
+                {wsError}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+              {/* Contact Information & Social Media Links */}
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+                <h3 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                  <Settings size={18} className="color-primary" />
+                  Contact Info & Social Links
+                </h3>
+                
+                <form onSubmit={handleSaveContactInfo} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Business Name</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={wsBusinessName}
+                      onChange={(e) => setWsBusinessName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-field">
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Business Email</label>
+                      <input 
+                        type="email" 
+                        className="form-input" 
+                        value={wsBusinessEmail}
+                        onChange={(e) => setWsBusinessEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Support Email</label>
+                      <input 
+                        type="email" 
+                        className="form-input" 
+                        value={wsCustomerSupportEmail}
+                        onChange={(e) => setWsCustomerSupportEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-field">
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Mobile Number</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="+91 98765 43210"
+                        value={wsMobileNumber}
+                        onChange={(e) => setWsMobileNumber(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>WhatsApp Number (digits only)</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="919876543210"
+                        value={wsWhatsAppNumber}
+                        onChange={(e) => setWsWhatsAppNumber(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Business Address</label>
+                    <textarea 
+                      className="form-input" 
+                      rows="2"
+                      value={wsBusinessAddress}
+                      onChange={(e) => setWsBusinessAddress(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Instagram Link</label>
+                    <input 
+                      type="url" 
+                      className="form-input" 
+                      value={wsInstagramLink}
+                      onChange={(e) => setWsInstagramLink(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Facebook Link</label>
+                    <input 
+                      type="url" 
+                      className="form-input" 
+                      value={wsFacebookLink}
+                      onChange={(e) => setWsFacebookLink(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>YouTube Link</label>
+                    <input 
+                      type="url" 
+                      className="form-input" 
+                      value={wsYouTubeLink}
+                      onChange={(e) => setWsYouTubeLink(e.target.value)}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    disabled={savingWebsiteSettings}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
+                  >
+                    {savingWebsiteSettings ? <RefreshCw className="animate-spin" size={16} /> : <Check size={16} />}
+                    {savingWebsiteSettings ? 'Saving Settings...' : 'Save Contact Details'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Policy Pages Editor */}
+              <div style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+                <h3 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                  <FileText size={18} className="color-primary" />
+                  Policy Pages Content Editor
+                </h3>
+
+                <form onSubmit={handleSavePolicyContent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Select Policy Page to Edit</label>
+                    <select
+                      className="form-input"
+                      value={selectedPolicy}
+                      onChange={(e) => setSelectedPolicy(e.target.value)}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      <option value="aboutUs">About Us</option>
+                      <option value="privacyPolicy">Privacy Policy</option>
+                      <option value="termsConditions">Terms & Conditions</option>
+                      <option value="refundPolicy">Refund & Cancellation Policy</option>
+                      <option value="shippingPolicy">Shipping & Delivery Policy</option>
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Page Content</label>
+                    <textarea 
+                      className="form-input" 
+                      rows="12"
+                      placeholder="Write policy content..."
+                      value={policyContent}
+                      onChange={(e) => setPolicyContent(e.target.value)}
+                      required
+                      style={{ lineHeight: '1.6', fontSize: '0.9rem' }}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    disabled={savingWebsiteSettings}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
+                  >
+                    {savingWebsiteSettings ? <RefreshCw className="animate-spin" size={16} /> : <Check size={16} />}
+                    {savingWebsiteSettings ? 'Saving Content...' : 'Save Policy Content'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Product ADD / EDIT Modal Drawer */}
@@ -1913,6 +2247,43 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 </div>
               </div>
 
+              {/* Stock and Toggles Section */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                <div className="form-field">
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Total Stock Quantity</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="e.g. 100"
+                    value={prodStock}
+                    onChange={(e) => setProdStock(e.target.value)}
+                    min="0"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '24px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="prodFeaturedCheckbox"
+                    checked={prodFeatured}
+                    onChange={(e) => setProdFeatured(e.target.checked)}
+                    style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="prodFeaturedCheckbox" style={{ fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' }}>Featured Product</label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '24px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="prodLimitedCheckbox"
+                    checked={prodLimited}
+                    onChange={(e) => setProdLimited(e.target.checked)}
+                    style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="prodLimitedCheckbox" style={{ fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' }}>Limited Offer</label>
+                </div>
+              </div>
+
               {/* Product Variants Section */}
               <div style={{ border: '1px solid var(--border-light)', padding: '20px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--charcoal)', marginBottom: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Product Variants</h3>
@@ -1987,26 +2358,83 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                     </div>
 
                     <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '10px', background: '#FFF', minHeight: '80px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>Preview</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '10px', textTransform: 'uppercase' }}>Configured Colors Preview</span>
                       {prodColors.length === 0 ? (
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontStyle: 'italic' }}>No colors added.</span>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           {prodColors.map((col, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#FAF7FB', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col.code, border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block' }} />
-                                <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--charcoal)' }}>{col.name}</span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({col.code})</span>
+                            <div key={idx} style={{ padding: '14px', background: '#FAF7FB', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {/* Header row: color name, color dot, delete button */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: col.code, border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block' }} />
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--charcoal)' }}>{col.name}</span>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({col.code})</span>
+                                </div>
+                                <button 
+                                  type="button" 
+                                  onClick={() => handleRemoveColorOption(idx)}
+                                  style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                  title="Remove Color"
+                                >
+                                  <X size={16} />
+                                </button>
                               </div>
-                              <button 
-                                type="button" 
-                                onClick={() => handleRemoveColorOption(idx)}
-                                style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
-                                title="Remove"
-                              >
-                                <X size={12} />
-                              </button>
+
+                              {/* Associated Image Dropdown */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)', minWidth: '130px' }}>Linked Image Swap:</span>
+                                <select
+                                  value={col.imageIndex !== undefined ? col.imageIndex : -1}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setProdColors(prev => prev.map((c, i) => i === idx ? { ...c, imageIndex: val } : c));
+                                  }}
+                                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                                >
+                                  <option value={-1}>No Image Swap (Default)</option>
+                                  {prodImages.map((imgUrl, imgIdx) => (
+                                    <option key={imgIdx} value={imgIdx}>Image {imgIdx + 1}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Size checkboxes specifically for this color */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Available Sizes for this Color:</span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                                  {prodSizes.length === 0 ? (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Please select product sizes above first.</span>
+                                  ) : (
+                                    prodSizes.map(sz => {
+                                      const isSizeChecked = col.sizes && col.sizes.includes(sz);
+                                      return (
+                                        <label key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', background: isSizeChecked ? 'var(--primary-light)' : '#FFF', color: isSizeChecked ? 'var(--primary-dark)' : 'var(--text-main)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', userSelect: 'none' }}>
+                                          <input 
+                                            type="checkbox"
+                                            checked={isSizeChecked}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              setProdColors(prev => prev.map((c, i) => {
+                                                if (i === idx) {
+                                                  const newSizes = checked 
+                                                    ? [...(c.sizes || []), sz]
+                                                    : (c.sizes || []).filter(s => s !== sz);
+                                                  return { ...c, sizes: newSizes };
+                                                }
+                                                return c;
+                                              }));
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                          />
+                                          {sz}
+                                        </label>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>

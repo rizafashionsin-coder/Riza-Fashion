@@ -51,10 +51,22 @@ const Youtube = (props) => (
   </svg>
 );
 
-export default function Footer({ onNavigate }) {
+export default function Footer({ onNavigate, settings }) {
   const handleLinkClick = (view, category = null) => {
     onNavigate(view, category);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const contact = settings || {
+    businessName: "Riza Fashions",
+    businessEmail: "care@rizafashions.com",
+    customerSupportEmail: "support@rizafashions.com",
+    mobileNumber: "+91 98765 43210",
+    whatsAppNumber: "919876543210",
+    businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
+    instagramLink: "https://instagram.com",
+    facebookLink: "https://facebook.com",
+    youtubeLink: "https://youtube.com"
   };
 
   return (
@@ -70,26 +82,31 @@ export default function Footer({ onNavigate }) {
             Elegance crafted for every woman. We design premium garments using the finest fabrics, detailed embroidery, and contemporary cuts to celebrate your unique identity.
           </p>
           <div className="footer-social-row">
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Instagram">
-              <Instagram size={18} />
-            </a>
-            <a href="https://facebook.com" target="_blank" rel="noreferrer" aria-label="Facebook">
-              <Facebook size={18} />
-            </a>
-            <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="Youtube">
-              <Youtube size={18} />
-            </a>
+            {contact.instagramLink && (
+              <a href={contact.instagramLink} target="_blank" rel="noreferrer" aria-label="Instagram">
+                <Instagram size={18} />
+              </a>
+            )}
+            {contact.facebookLink && (
+              <a href={contact.facebookLink} target="_blank" rel="noreferrer" aria-label="Facebook">
+                <Facebook size={18} />
+              </a>
+            )}
+            {contact.youtubeLink && (
+              <a href={contact.youtubeLink} target="_blank" rel="noreferrer" aria-label="Youtube">
+                <Youtube size={18} />
+              </a>
+            )}
           </div>
         </div>
 
-        {/* Shop Navigation Column */}
+        {/* Company Column */}
         <div className="footer-col">
-          <h4>Shop Links</h4>
+          <h4>Company</h4>
           <ul className="footer-links-list">
-            <li><button onClick={() => handleLinkClick('home')}>Home Page</button></li>
-            <li><button onClick={() => handleLinkClick('shop')}>All Products</button></li>
-            <li><button onClick={() => handleLinkClick('shop', null)}>New Arrivals</button></li>
-            <li><button onClick={() => handleLinkClick('wishlist')}>Your Wishlist</button></li>
+            <li><button onClick={() => handleLinkClick('about')}>About Us</button></li>
+            <li><button onClick={() => handleLinkClick('contact')}>Contact Us</button></li>
+            <li><button onClick={() => handleLinkClick('shop')}>Shop Collections</button></li>
           </ul>
         </div>
 
@@ -106,14 +123,14 @@ export default function Footer({ onNavigate }) {
           </ul>
         </div>
 
-        {/* Customer Support Column */}
+        {/* Customer Service Column */}
         <div className="footer-col">
           <h4>Customer Service</h4>
           <ul className="footer-links-list">
-            <li><button onClick={() => handleLinkClick('orders')}>My Orders</button></li>
-            <li><button onClick={() => handleLinkClick('contact')}>Contact Us</button></li>
-            <li><a href="#shipping">Shipping & FAQs</a></li>
-            <li><a href="#privacy">Privacy & Policy</a></li>
+            <li><button onClick={() => handleLinkClick('shipping-policy')}>Shipping Policy</button></li>
+            <li><button onClick={() => handleLinkClick('refund-policy')}>Refund Policy</button></li>
+            <li><button onClick={() => handleLinkClick('terms-conditions')}>Terms & Conditions</button></li>
+            <li><button onClick={() => handleLinkClick('privacy-policy')}>Privacy Policy</button></li>
           </ul>
         </div>
 
@@ -121,18 +138,30 @@ export default function Footer({ onNavigate }) {
         <div className="footer-col contact-col">
           <h4>Contact Us</h4>
           <ul className="footer-contact-list">
-            <li>
-              <MapPin size={16} className="contact-icon" />
-              <span>102, Lavender Boulevard, Fashion District, Mumbai, 400001</span>
-            </li>
-            <li>
-              <Phone size={16} className="contact-icon" />
-              <span>+91 98765 43210</span>
-            </li>
-            <li>
-              <Mail size={16} className="contact-icon" />
-              <span>care@rizafashions.com</span>
-            </li>
+            {contact.businessAddress && (
+              <li>
+                <MapPin size={16} className="contact-icon" style={{ flexShrink: 0 }} />
+                <span>{contact.businessAddress}</span>
+              </li>
+            )}
+            {contact.mobileNumber && (
+              <li>
+                <Phone size={16} className="contact-icon" style={{ flexShrink: 0 }} />
+                <span>{contact.mobileNumber}</span>
+              </li>
+            )}
+            {contact.whatsAppNumber && (
+              <li>
+                <Phone size={16} className="contact-icon" style={{ flexShrink: 0 }} />
+                <span>WhatsApp: +{contact.whatsAppNumber}</span>
+              </li>
+            )}
+            {contact.businessEmail && (
+              <li>
+                <Mail size={16} className="contact-icon" style={{ flexShrink: 0 }} />
+                <span>{contact.businessEmail}</span>
+              </li>
+            )}
           </ul>
         </div>
 
