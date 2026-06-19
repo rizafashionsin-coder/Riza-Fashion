@@ -2137,23 +2137,12 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                    <div className="form-field">
                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Page Content</label>
                      <textarea 
-                       className="form-input" 
+                       className="admin-textarea" 
                        rows="12"
                        placeholder="Write policy content..."
                        value={policyContent}
                        onChange={(e) => setPolicyContent(e.target.value)}
                        required
-                       style={{ 
-                         width: '100%',
-                         minHeight: '300px',
-                         height: '350px',
-                         padding: '16px',
-                         borderRadius: '12px',
-                         resize: 'vertical',
-                         overflowY: 'auto',
-                         lineHeight: '1.6',
-                         fontSize: '0.9rem'
-                       }}
                      />
                    </div>
 
