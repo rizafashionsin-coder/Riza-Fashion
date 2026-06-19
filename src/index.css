@@ -356,6 +356,11 @@ img {
   transition: var(--transition-fast);
 }
 
+textarea.form-input {
+  border-radius: 12px;
+  resize: vertical;
+}
+
 .form-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(176, 107, 179, 0.15);
