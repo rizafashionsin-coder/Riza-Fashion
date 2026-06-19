@@ -35,7 +35,8 @@ import {
   query,
   orderBy,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  deleteField
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -186,9 +187,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [prodPrice, setProdPrice] = useState('');
   const [prodSalePrice, setProdSalePrice] = useState('');
   const [prodDescription, setProdDescription] = useState('');
-  const [prodSizes, setProdSizes] = useState([]);
-  const [prodSizeStock, setProdSizeStock] = useState({});
-  const [prodColors, setProdColors] = useState([]);
+  const [prodVariants, setProdVariants] = useState([]);
   const [colorPickerCode, setColorPickerCode] = useState('#D4A5A5');
   const [colorInputName, setColorInputName] = useState('');
   const [prodDetails, setProdDetails] = useState('');
@@ -673,9 +672,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdPrice('');
     setProdSalePrice('');
     setProdDescription('');
-    setProdSizes([]);
-    setProdSizeStock({});
-    setProdColors([]);
+    setProdVariants([]);
     setColorPickerCode('#D4A5A5');
     setColorInputName('');
     setProdDetails('');
@@ -696,37 +693,42 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdPrice(product.price || '');
     setProdSalePrice(product.salePrice || '');
     setProdDescription(product.description || '');
-    setProdSizes(product.sizes || []);
-    setProdSizeStock(product.sizeStock || {});
     setProdStock(product.stock !== undefined ? product.stock : 100);
     setProdFeatured(product.featured !== undefined ? product.featured : (product.isFeatured || false));
     setProdLimited(product.limitedOffer !== undefined ? product.limitedOffer : (product.isLimited || false));
     
-    let initialColors = [];
-    if (product.colors && Array.isArray(product.colors)) {
-      initialColors = product.colors.map(c => {
-        if (typeof c === 'string') {
-          return {
-            name: c,
-            code: c.toLowerCase().includes('lavender') ? '#B06BB3' :
-                  c.toLowerCase().includes('rose') ? '#D4A5A5' :
-                  c.toLowerCase().includes('white') ? '#FFFFFF' :
-                  c.toLowerCase().includes('charcoal') ? '#2D2D2D' :
-                  c.toLowerCase().includes('lilac') ? '#E9D8EF' :
-                  c.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5',
-            imageIndex: -1,
-            sizes: product.sizes || []
-          };
-        }
+    let initialVariants = [];
+    if (product.variants && Array.isArray(product.variants)) {
+      initialVariants = product.variants;
+    } else if (product.colors && Array.isArray(product.colors)) {
+      // Migrate old colors & sizeStock/sizes to the new variants matrix
+      initialVariants = product.colors.map(col => {
+        const colName = typeof col === 'string' ? col : col.name;
+        const colCode = typeof col === 'string' ? (
+          col.toLowerCase().includes('lavender') ? '#B06BB3' :
+          col.toLowerCase().includes('rose') ? '#D4A5A5' :
+          col.toLowerCase().includes('white') ? '#FFFFFF' :
+          col.toLowerCase().includes('charcoal') ? '#2D2D2D' :
+          col.toLowerCase().includes('lilac') ? '#E9D8EF' :
+          col.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+        ) : col.code;
+        const imgIdx = typeof col === 'string' ? -1 : (col.imageIndex !== undefined ? col.imageIndex : -1);
+        
+        const sizesObj = {};
+        const colSizes = (typeof col === 'object' && col.sizes) ? col.sizes : (product.sizes || []);
+        colSizes.forEach(sz => {
+          sizesObj[sz] = product.sizeStock?.[sz] !== undefined ? product.sizeStock[sz] : 10;
+        });
+        
         return {
-          name: c.name,
-          code: c.code,
-          imageIndex: c.imageIndex !== undefined ? c.imageIndex : -1,
-          sizes: c.sizes || product.sizes || []
+          colorName: colName,
+          colorCode: colCode,
+          imageIndex: imgIdx,
+          sizes: sizesObj
         };
       });
     }
-    setProdColors(initialColors);
+    setProdVariants(initialVariants);
     setColorPickerCode('#D4A5A5');
     setColorInputName('');
     
@@ -773,28 +775,36 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // Handle checkbox size toggles
-  const handleSizeToggle = (size) => {
-    setProdSizes(prev => {
-      if (prev.includes(size)) {
-        setProdSizeStock(stock => {
-          const updated = { ...stock };
-          delete updated[size];
-          return updated;
-        });
-        return prev.filter(s => s !== size);
-      } else {
-        setProdSizeStock(stock => ({
-          ...stock,
-          [size]: 10
-        }));
-        return [...prev, size];
+  // Size toggle for a specific color variant
+  const handleVariantSizeToggle = (varIdx, size, isChecked) => {
+    setProdVariants(prev => prev.map((v, i) => {
+      if (i === varIdx) {
+        const newSizes = { ...v.sizes };
+        if (isChecked) {
+          newSizes[size] = 10; // default stock when checked
+        } else {
+          delete newSizes[size];
+        }
+        return { ...v, sizes: newSizes };
       }
-    });
+      return v;
+    }));
   };
 
-  // Color addition handler
-  const handleAddColorOption = () => {
+  // Stock quantity updater for a specific color variant size
+  const handleVariantStockChange = (varIdx, size, stockVal) => {
+    setProdVariants(prev => prev.map((v, i) => {
+      if (i === varIdx) {
+        const newSizes = { ...v.sizes };
+        newSizes[size] = stockVal === '' ? '' : Number(stockVal);
+        return { ...v, sizes: newSizes };
+      }
+      return v;
+    }));
+  };
+
+  // Variant addition handler
+  const handleAddVariant = () => {
     setFormError('');
     const name = colorInputName.trim();
     const code = colorPickerCode.trim();
@@ -802,8 +812,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError("Please enter a color name.");
       return;
     }
-    const nameExists = prodColors.some(c => c.name.toLowerCase() === name.toLowerCase());
-    const codeExists = prodColors.some(c => c.code.toLowerCase() === code.toLowerCase());
+    const nameExists = prodVariants.some(v => v.colorName.toLowerCase() === name.toLowerCase());
+    const codeExists = prodVariants.some(v => v.colorCode.toLowerCase() === code.toLowerCase());
     if (nameExists) {
       setFormError(`The color name "${name}" has already been added.`);
       return;
@@ -812,18 +822,18 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError(`The color code "${code}" has already been added.`);
       return;
     }
-    setProdColors(prev => [...prev, { 
-      name, 
-      code,
+    setProdVariants(prev => [...prev, { 
+      colorName: name,
+      colorCode: code,
       imageIndex: -1,
-      sizes: [...prodSizes]
+      sizes: {}
     }]);
     setColorInputName('');
   };
 
-  // Color removal handler
-  const handleRemoveColorOption = (indexToRemove) => {
-    setProdColors(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  // Variant removal handler
+  const handleRemoveVariant = (indexToRemove) => {
+    setProdVariants(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   // Submit Product Add/Edit Form
@@ -844,12 +854,13 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError("Please enter a valid sale price.");
       return;
     }
-    if (prodSizes.length === 0) {
-      setFormError("At least one product size is required.");
+    if (prodVariants.length === 0) {
+      setFormError("At least one product color variant is required.");
       return;
     }
-    if (prodColors.length === 0) {
-      setFormError("At least one product color is required.");
+    const hasUnconfiguredVariant = prodVariants.some(v => !v.sizes || Object.keys(v.sizes).length === 0);
+    if (hasUnconfiguredVariant) {
+      setFormError("Each configured color variant must have at least one size checked.");
       return;
     }
     if (prodImages.length === 0) {
@@ -865,11 +876,9 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       ? prodDetails.split('\n').map(d => d.trim()).filter(Boolean) 
       : [];
 
-    const sizeStockObj = {};
-    prodSizes.forEach(sz => {
-      const stockVal = prodSizeStock[sz];
-      sizeStockObj[sz] = stockVal !== undefined && stockVal !== '' ? Number(stockVal) : 10;
-    });
+    const totalStock = prodVariants.reduce((sum, v) => {
+      return sum + Object.values(v.sizes || {}).reduce((sSum, qty) => sSum + Number(qty), 0);
+    }, 0);
 
     const productPayload = {
       name: prodName,
@@ -878,9 +887,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       salePrice: salePrice,
       discount: discount >= 0 ? discount : 0,
       description: prodDescription,
-      sizes: prodSizes,
-      sizeStock: sizeStockObj,
-      colors: prodColors,
+      variants: prodVariants,
       details: detailsArray,
       images: prodImages,
       rating: editingProduct ? (editingProduct.rating || 5.0) : 5.0,
@@ -890,8 +897,14 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       featured: prodFeatured,
       isLimited: prodLimited,
       limitedOffer: prodLimited,
-      stock: Number(prodStock)
+      stock: totalStock
     };
+
+    if (editingProduct) {
+      productPayload.sizes = deleteField();
+      productPayload.sizeStock = deleteField();
+      productPayload.colors = deleteField();
+    }
 
     try {
       if (editingProduct) {
@@ -2290,49 +2303,10 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
               <div style={{ border: '1px solid var(--border-light)', padding: '20px', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--charcoal)', marginBottom: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Product Variants</h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                  {/* Sizes Variant Group */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Colors Variant Group Input */}
                   <div className="form-field">
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600 }}>Available Sizes *</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {sizeOptions.map(sz => {
-                        const isChecked = prodSizes.includes(sz);
-                        return (
-                          <div key={sz} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', background: isChecked ? '#FAF7FB' : '#FFF', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border-light)', minWidth: '80px', userSelect: 'none' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={isChecked}
-                                onChange={() => handleSizeToggle(sz)}
-                                style={{ cursor: 'pointer' }}
-                              />
-                              {sz}
-                            </label>
-                            {isChecked && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stock Qty:</span>
-                                <input 
-                                  type="number" 
-                                  min="0" 
-                                  placeholder="10"
-                                  value={prodSizeStock[sz] !== undefined ? prodSizeStock[sz] : 10}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? '' : Number(e.target.value);
-                                    setProdSizeStock(prev => ({ ...prev, [sz]: val }));
-                                  }}
-                                  style={{ width: '60px', padding: '4px 6px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Colors Variant Group */}
-                  <div className="form-field">
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600 }}>Available Colors *</label>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600 }}>Configure Colors & Size-Specific Stock *</label>
                     
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
                       <input 
@@ -2351,34 +2325,34 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                       />
                       <button 
                         type="button" 
-                        onClick={handleAddColorOption}
+                        onClick={handleAddVariant}
                         className="btn btn-primary"
                         style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600, minWidth: '80px' }}
                       >
-                        Add
+                        Add Color
                       </button>
                     </div>
 
                     <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '10px', background: '#FFF', minHeight: '80px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '10px', textTransform: 'uppercase' }}>Configured Colors Preview</span>
-                      {prodColors.length === 0 ? (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontStyle: 'italic' }}>No colors added.</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '10px', textTransform: 'uppercase' }}>Configured Color Matrix Preview</span>
+                      {prodVariants.length === 0 ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontStyle: 'italic' }}>No variants added. Please select color, type name, and click "Add Color" above.</span>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {prodColors.map((col, idx) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {prodVariants.map((col, idx) => (
                             <div key={idx} style={{ padding: '14px', background: '#FAF7FB', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                               {/* Header row: color name, color dot, delete button */}
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: col.code, border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block' }} />
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--charcoal)' }}>{col.name}</span>
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({col.code})</span>
+                                  <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: col.colorCode, border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block' }} />
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--charcoal)' }}>{col.colorName}</span>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({col.colorCode})</span>
                                 </div>
                                 <button 
                                   type="button" 
-                                  onClick={() => handleRemoveColorOption(idx)}
+                                  onClick={() => handleRemoveVariant(idx)}
                                   style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
-                                  title="Remove Color"
+                                  title="Remove Color Variant"
                                 >
                                   <X size={16} />
                                 </button>
@@ -2391,7 +2365,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                                   value={col.imageIndex !== undefined ? col.imageIndex : -1}
                                   onChange={(e) => {
                                     const val = Number(e.target.value);
-                                    setProdColors(prev => prev.map((c, i) => i === idx ? { ...c, imageIndex: val } : c));
+                                    setProdVariants(prev => prev.map((c, i) => i === idx ? { ...c, imageIndex: val } : c));
                                   }}
                                   style={{ flex: 1, padding: '4px 8px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
                                 >
@@ -2402,39 +2376,39 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                                 </select>
                               </div>
 
-                              {/* Size checkboxes specifically for this color */}
+                              {/* Size configuration list for this color */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Available Sizes for this Color:</span>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
-                                  {prodSizes.length === 0 ? (
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Please select product sizes above first.</span>
-                                  ) : (
-                                    prodSizes.map(sz => {
-                                      const isSizeChecked = col.sizes && col.sizes.includes(sz);
-                                      return (
-                                        <label key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', cursor: 'pointer', background: isSizeChecked ? 'var(--primary-light)' : '#FFF', color: isSizeChecked ? 'var(--primary-dark)' : 'var(--text-main)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', userSelect: 'none' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Available Sizes & Stock for {col.colorName}:</span>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', marginTop: '4px' }}>
+                                  {sizeOptions.map(sz => {
+                                    const isSizeChecked = col.sizes && col.sizes[sz] !== undefined;
+                                    return (
+                                      <div key={sz} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', cursor: 'pointer', background: isSizeChecked ? 'var(--primary-light)' : '#FFF', color: isSizeChecked ? 'var(--primary-dark)' : 'var(--text-main)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', userSelect: 'none', minWidth: '60px' }}>
                                           <input 
                                             type="checkbox"
                                             checked={isSizeChecked}
-                                            onChange={(e) => {
-                                              const checked = e.target.checked;
-                                              setProdColors(prev => prev.map((c, i) => {
-                                                if (i === idx) {
-                                                  const newSizes = checked 
-                                                    ? [...(c.sizes || []), sz]
-                                                    : (c.sizes || []).filter(s => s !== sz);
-                                                  return { ...c, sizes: newSizes };
-                                                }
-                                                return c;
-                                              }));
-                                            }}
-                                            style={{ cursor: 'pointer' }}
+                                            onChange={(e) => handleVariantSizeToggle(idx, sz, e.target.checked)}
+                                            style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
                                           />
                                           {sz}
                                         </label>
-                                      );
-                                    })
-                                  )}
+                                        {isSizeChecked && (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Stock:</span>
+                                            <input 
+                                              type="number"
+                                              min="0"
+                                              placeholder="10"
+                                              value={col.sizes[sz] !== undefined ? col.sizes[sz] : 10}
+                                              onChange={(e) => handleVariantStockChange(idx, sz, e.target.value)}
+                                              style={{ width: '55px', padding: '2px 4px', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </div>

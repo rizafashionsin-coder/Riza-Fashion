@@ -102,7 +102,9 @@ export default function CartPage({
                 const liveProd = (products || []).find(p => p.id === item.id) || item;
                 const itemPrice = liveProd.salePrice || liveProd.price;
                 const itemOriginalPrice = liveProd.price;
-                const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                const variant = liveProd.variants?.find(v => v.colorName === item.selectedColor);
+                const imageIndex = variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 ? variant.imageIndex : 0;
+                const itemImage = liveProd.images && liveProd.images[imageIndex] ? liveProd.images[imageIndex] : (item.images ? item.images[0] : '');
                 const itemName = liveProd.name || item.name;
                 return (
                   <div key={idx} className="cart-item-row">

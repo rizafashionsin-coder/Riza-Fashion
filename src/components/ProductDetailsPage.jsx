@@ -52,35 +52,67 @@ export default function ProductDetailsPage({
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
-  // Filter sizes based on selected color's available sizes
+  // Filter sizes based on selected color's available sizes from variants matrix
   const validSizes = useMemo(() => {
     if (!product) return [];
+    if (product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      return variant && variant.sizes ? Object.keys(variant.sizes) : [];
+    }
+    // Backward compatibility fallback
     const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === selectedColor);
     if (colObj && colObj.sizes) {
-      return product.sizes.filter(sz => colObj.sizes.includes(sz));
+      return (product.sizes || []).filter(sz => colObj.sizes.includes(sz));
     }
     return product.sizes || [];
   }, [product, selectedColor]);
 
+  // Selected size's live stock quantity
+  const selectedVariantStock = useMemo(() => {
+    if (!product || !selectedColor || !selectedSize) return 0;
+    if (product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      return variant && variant.sizes && variant.sizes[selectedSize] !== undefined ? variant.sizes[selectedSize] : 0;
+    }
+    // Backward compatibility fallback
+    return product.sizeStock && product.sizeStock[selectedSize] !== undefined ? product.sizeStock[selectedSize] : 0;
+  }, [product, selectedColor, selectedSize]);
+
   // Handle color change (image swap + auto-adjust sizes)
   const handleColorChange = (colorName) => {
     setSelectedColor(colorName);
-    const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === colorName);
-    if (colObj) {
-      // Update image if available
-      if (colObj.imageIndex !== undefined && colObj.imageIndex !== -1 && product.images[colObj.imageIndex]) {
-        setSelectedImageIdx(colObj.imageIndex);
-      }
-      // Adjust selected size if it's not valid for the new color
-      const nextValidSizes = colObj.sizes 
-        ? product.sizes.filter(sz => colObj.sizes.includes(sz))
-        : product.sizes || [];
-      if (nextValidSizes.length > 0) {
-        if (!nextValidSizes.includes(selectedSize)) {
-          setSelectedSize(nextValidSizes[0]);
+    if (product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === colorName);
+      if (variant) {
+        if (variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+          setSelectedImageIdx(variant.imageIndex);
         }
-      } else {
-        setSelectedSize('');
+        const nextValidSizes = variant.sizes ? Object.keys(variant.sizes) : [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
+      }
+    } else {
+      // Backward compatibility fallback
+      const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === colorName);
+      if (colObj) {
+        if (colObj.imageIndex !== undefined && colObj.imageIndex !== -1 && product.images[colObj.imageIndex]) {
+          setSelectedImageIdx(colObj.imageIndex);
+        }
+        const nextValidSizes = colObj.sizes 
+          ? (product.sizes || []).filter(sz => colObj.sizes.includes(sz))
+          : product.sizes || [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
       }
     }
   };
@@ -90,15 +122,24 @@ export default function ProductDetailsPage({
     if (product) {
       setSelectedImageIdx(0);
       
-      const initialColor = (product.colors && product.colors.length > 0) 
-        ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
-        : '';
+      let initialColor = '';
+      if (product.variants && product.variants.length > 0) {
+        initialColor = product.variants[0].colorName;
+      } else if (product.colors && product.colors.length > 0) {
+        initialColor = typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name;
+      }
       setSelectedColor(initialColor);
 
-      const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === initialColor);
-      const initialValidSizes = (colObj && colObj.sizes)
-        ? product.sizes.filter(sz => colObj.sizes.includes(sz))
-        : product.sizes || [];
+      let initialValidSizes = [];
+      if (product.variants && Array.isArray(product.variants)) {
+        const variant = product.variants.find(v => v.colorName === initialColor);
+        initialValidSizes = variant && variant.sizes ? Object.keys(variant.sizes) : [];
+      } else {
+        const colObj = product.colors?.find(c => (typeof c === 'string' ? c : c.name) === initialColor);
+        initialValidSizes = (colObj && colObj.sizes)
+          ? (product.sizes || []).filter(sz => colObj.sizes.includes(sz))
+          : product.sizes || [];
+      }
       
       const initialSize = (initialValidSizes && initialValidSizes.length > 0) ? initialValidSizes[0] : 'Free Size';
       setSelectedSize(initialSize);
@@ -177,6 +218,7 @@ export default function ProductDetailsPage({
       ...product,
       selectedSize,
       selectedColor,
+      variantStock: selectedVariantStock,
       quantity
     });
   };
@@ -187,6 +229,7 @@ export default function ProductDetailsPage({
         id: product.id,
         selectedSize,
         selectedColor,
+        variantStock: selectedVariantStock,
         quantity
       };
       try {
@@ -198,6 +241,7 @@ export default function ProductDetailsPage({
         ...product,
         selectedSize,
         selectedColor,
+        variantStock: selectedVariantStock,
         quantity
       });
       onNavigate('checkout');
@@ -319,31 +363,43 @@ export default function ProductDetailsPage({
             {/* Variant options */}
             <div className="product-variants-section">
               {/* Colors */}
-              {product.colors && product.colors.length > 0 && (
+              {((product.variants && product.variants.length > 0) || (product.colors && product.colors.length > 0)) && (
                 <div className="variant-group">
                   <span className="variant-label">Color: <strong>{selectedColor}</strong></span>
                   <div className="variant-bubbles">
-                    {product.colors.map((col, idx) => {
-                      const colorName = typeof col === 'string' ? col : col.name;
-                      const colorCode = typeof col === 'string' ? (
-                        col.toLowerCase().includes('lavender') ? '#B06BB3' :
-                        col.toLowerCase().includes('rose') ? '#D4A5A5' :
-                        col.toLowerCase().includes('white') ? '#FFFFFF' :
-                        col.toLowerCase().includes('charcoal') ? '#2D2D2D' :
-                        col.toLowerCase().includes('lilac') ? '#E9D8EF' :
-                        col.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
-                      ) : col.code;
-
-                      return (
+                    {product.variants && product.variants.length > 0 ? (
+                      product.variants.map((v, idx) => (
                         <button
                           key={idx}
-                          className={`color-bubble-btn ${selectedColor === colorName ? 'active' : ''}`}
-                          onClick={() => handleColorChange(colorName)}
-                          title={colorName}
-                          style={{ backgroundColor: colorCode }}
+                          className={`color-bubble-btn ${selectedColor === v.colorName ? 'active' : ''}`}
+                          onClick={() => handleColorChange(v.colorName)}
+                          title={v.colorName}
+                          style={{ backgroundColor: v.colorCode || '#DECFE5' }}
                         />
-                      );
-                    })}
+                      ))
+                    ) : (
+                      product.colors.map((col, idx) => {
+                        const colorName = typeof col === 'string' ? col : col.name;
+                        const colorCode = typeof col === 'string' ? (
+                          col.toLowerCase().includes('lavender') ? '#B06BB3' :
+                          col.toLowerCase().includes('rose') ? '#D4A5A5' :
+                          col.toLowerCase().includes('white') ? '#FFFFFF' :
+                          col.toLowerCase().includes('charcoal') ? '#2D2D2D' :
+                          col.toLowerCase().includes('lilac') ? '#E9D8EF' :
+                          col.toLowerCase().includes('wine') ? '#8E24AA' : '#DECFE5'
+                        ) : col.code;
+
+                        return (
+                          <button
+                            key={idx}
+                            className={`color-bubble-btn ${selectedColor === colorName ? 'active' : ''}`}
+                            onClick={() => handleColorChange(colorName)}
+                            title={colorName}
+                            style={{ backgroundColor: colorCode }}
+                          />
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
@@ -354,7 +410,13 @@ export default function ProductDetailsPage({
                   <span className="variant-label">Size: <strong>{selectedSize}</strong></span>
                   <div className="variant-sizes">
                     {validSizes.map((size, idx) => {
-                      const isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
+                      let isOutOfStock = false;
+                      if (product.variants && Array.isArray(product.variants)) {
+                        const variant = product.variants.find(v => v.colorName === selectedColor);
+                        isOutOfStock = variant && variant.sizes && variant.sizes[size] !== undefined ? variant.sizes[size] === 0 : false;
+                      } else {
+                        isOutOfStock = product.sizeStock && product.sizeStock[size] === 0;
+                      }
                       return (
                         <button
                           key={idx}
@@ -363,7 +425,7 @@ export default function ProductDetailsPage({
                           disabled={isOutOfStock}
                           style={isOutOfStock ? { opacity: 0.4, textDecoration: 'line-through', cursor: 'not-allowed' } : {}}
                         >
-                          {size}
+                          {size} {isOutOfStock ? <span style={{ fontSize: '0.65rem', marginLeft: '4px', opacity: 0.8 }}>(Out of Stock)</span> : ''}
                         </button>
                       );
                     })}
@@ -394,12 +456,22 @@ export default function ProductDetailsPage({
 
             {/* Action buttons */}
             <div className="meta-actions-grid">
-              <button className="btn btn-primary" onClick={handleAddToCartClick}>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleAddToCartClick}
+                disabled={selectedVariantStock === 0}
+                style={selectedVariantStock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+              >
                 <ShoppingBag size={18} />
-                <span>Add to Cart</span>
+                <span>{selectedVariantStock === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
               </button>
               
-              <button className="btn btn-accent" onClick={handleBuyNowClick}>
+              <button 
+                className="btn btn-accent" 
+                onClick={handleBuyNowClick}
+                disabled={selectedVariantStock === 0}
+                style={selectedVariantStock === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+              >
                 <span>Buy Now</span>
               </button>
               

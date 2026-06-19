@@ -822,12 +822,35 @@ export default function App() {
 
   // Standard cart card addition trigger (sets defaults for size/color)
   const handleCardAddToCart = (product) => {
+    let defaultColor = '';
+    let defaultSize = 'Free Size';
+    let defaultVariantStock = 10;
+    
+    if (product.variants && product.variants.length > 0) {
+      // Find the first variant with sizes
+      const firstVar = product.variants[0];
+      defaultColor = firstVar.colorName;
+      if (firstVar.sizes) {
+        const sizeKeys = Object.keys(firstVar.sizes);
+        // Prefer size with stock > 0
+        const inStockSize = sizeKeys.find(sz => firstVar.sizes[sz] > 0);
+        defaultSize = inStockSize || sizeKeys[0] || 'Free Size';
+        defaultVariantStock = firstVar.sizes[defaultSize] !== undefined ? firstVar.sizes[defaultSize] : 10;
+      }
+    } else {
+      // Backward compatibility fallback
+      defaultSize = (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size';
+      defaultColor = (product.colors && product.colors.length > 0) 
+        ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
+        : '';
+      defaultVariantStock = product.sizeStock && product.sizeStock[defaultSize] !== undefined ? product.sizeStock[defaultSize] : 10;
+    }
+    
     const defaultItem = {
       ...product,
-      selectedSize: (product.sizes && product.sizes.length > 0) ? product.sizes[0] : 'Free Size',
-      selectedColor: (product.colors && product.colors.length > 0) 
-        ? (typeof product.colors[0] === 'string' ? product.colors[0] : product.colors[0].name)
-        : '',
+      selectedSize: defaultSize,
+      selectedColor: defaultColor,
+      variantStock: defaultVariantStock,
       quantity: 1
     };
     handleAddToCart(defaultItem);
@@ -841,8 +864,20 @@ export default function App() {
           item.selectedSize === itemToUpdate.selectedSize &&
           item.selectedColor === itemToUpdate.selectedColor
         ) {
+          const liveProd = products.find(p => p.id === item.id);
+          let maxStock = 10;
+          if (liveProd) {
+            if (liveProd.variants && Array.isArray(liveProd.variants)) {
+              const variant = liveProd.variants.find(v => v.colorName === item.selectedColor);
+              if (variant && variant.sizes && variant.sizes[item.selectedSize] !== undefined) {
+                maxStock = variant.sizes[item.selectedSize];
+              }
+            } else if (liveProd.sizeStock && liveProd.sizeStock[item.selectedSize] !== undefined) {
+              maxStock = liveProd.sizeStock[item.selectedSize];
+            }
+          }
           const newQty = item.quantity + delta;
-          return { ...item, quantity: Math.max(1, Math.min(10, newQty)) };
+          return { ...item, quantity: Math.max(1, Math.min(maxStock, newQty)) };
         }
         return item;
       })

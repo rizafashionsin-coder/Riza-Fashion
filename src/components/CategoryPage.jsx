@@ -125,6 +125,9 @@ export default function CategoryPage({
     // Availability Filter
     if (filterInStock) {
       list = list.filter(p => {
+        if (p.variants && Array.isArray(p.variants)) {
+          return p.variants.some(v => v.sizes && Object.values(v.sizes).some(stock => stock > 0));
+        }
         if (p.sizeStock) {
           return Object.values(p.sizeStock).some(stock => stock > 0);
         }
