@@ -5,6 +5,7 @@ import { doc, getDoc, collection, query, where, getDocs, updateDoc, increment } 
 
 export default function CheckoutPage({
   cart,
+  products = [],
   activeCoupon,
   onClearCart,
   onPlaceOrder,
@@ -104,7 +105,8 @@ export default function CheckoutPage({
 
   // Calculations
   const subtotal = selectedCheckoutItems.reduce((sum, item) => {
-    const price = item.salePrice || item.price;
+    const liveProd = (products || []).find(p => p.id === item.id) || item;
+    const price = liveProd.salePrice || liveProd.price;
     return sum + (price * item.quantity);
   }, 0);
 
@@ -459,35 +461,29 @@ export default function CheckoutPage({
                 <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                   Selected Product (Locked)
                 </span>
-                {buyNowCartItem ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
-                    <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
-                    <img src={buyNowCartItem.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
-                    <div style={{ flex: 1, textAlign: 'left' }}>
-                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>{buyNowCartItem.name}</strong>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        Size: {buyNowCartItem.selectedSize} {buyNowCartItem.selectedColor ? `| Color: ${buyNowCartItem.selectedColor}` : ''} • Qty: {buyNowCartItem.quantity}
+                {(() => {
+                  const item = buyNowCartItem || buyNowInfo;
+                  if (!item) return null;
+                  const liveProd = (products || []).find(p => p.id === item.id) || item;
+                  const itemPrice = liveProd.salePrice || liveProd.price;
+                  const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                  const itemName = liveProd.name || item.name;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+                      <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
+                      <img src={itemImage} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <div style={{ flex: 1, textAlign: 'left' }}>
+                        <strong style={{ fontSize: '0.9rem', display: 'block' }}>{itemName}</strong>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          Size: {item.selectedSize} {item.selectedColor ? `| Color: ${item.selectedColor}` : ''} • Qty: {item.quantity}
+                        </span>
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                        ₹{itemPrice * item.quantity}
                       </span>
                     </div>
-                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                      ₹{(buyNowCartItem.salePrice || buyNowCartItem.price) * buyNowCartItem.quantity}
-                    </span>
-                  </div>
-                ) : buyNowInfo ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
-                    <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
-                    {buyNowInfo.images && <img src={buyNowInfo.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />}
-                    <div style={{ flex: 1, textAlign: 'left' }}>
-                      <strong style={{ fontSize: '0.9rem', display: 'block' }}>{buyNowInfo.name || 'Buy Now Item'}</strong>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        Size: {buyNowInfo.selectedSize} {buyNowInfo.selectedColor ? `| Color: ${buyNowInfo.selectedColor}` : ''} • Qty: {buyNowInfo.quantity}
-                      </span>
-                    </div>
-                    <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                      ₹{(buyNowInfo.salePrice || buyNowInfo.price) * buyNowInfo.quantity}
-                    </span>
-                  </div>
-                ) : null}
+                  );
+                })()}
               </div>
 
               {/* Optional Cart Items list */}
@@ -500,6 +496,10 @@ export default function CheckoutPage({
                     {optionalCartItems.map((item, idx) => {
                       const itemKey = getItemKey(item);
                       const isChecked = !!selectedOptionalKeys[itemKey];
+                      const liveProd = (products || []).find(p => p.id === item.id) || item;
+                      const itemPrice = liveProd.salePrice || liveProd.price;
+                      const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                      const itemName = liveProd.name || item.name;
                       return (
                         <label 
                           key={idx} 
@@ -522,15 +522,15 @@ export default function CheckoutPage({
                             onChange={() => toggleOptionalItem(itemKey)} 
                             style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
                           />
-                          <img src={item.images[0]} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                          <img src={itemImage} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
                           <div style={{ flex: 1, textAlign: 'left' }}>
-                            <strong style={{ fontSize: '0.9rem', display: 'block', color: 'var(--charcoal)' }}>{item.name}</strong>
+                            <strong style={{ fontSize: '0.9rem', display: 'block', color: 'var(--charcoal)' }}>{itemName}</strong>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                               Size: {item.selectedSize} {item.selectedColor ? `| Color: ${item.selectedColor}` : ''} • Qty: {item.quantity}
                             </span>
                           </div>
                           <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--charcoal)' }}>
-                            ₹{(item.salePrice || item.price) * item.quantity}
+                            ₹{itemPrice * item.quantity}
                           </span>
                         </label>
                       );
@@ -694,15 +694,18 @@ export default function CheckoutPage({
             {/* Scrollable list of items */}
             <div className="checkout-items-list">
               {selectedCheckoutItems.map((item, idx) => {
-                const itemPrice = item.salePrice || item.price;
+                const liveProd = (products || []).find(p => p.id === item.id) || item;
+                const itemPrice = liveProd.salePrice || liveProd.price;
+                const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                const itemName = liveProd.name || item.name;
                 return (
                   <div key={idx} className="checkout-item-summary-row">
                     <div className="checkout-item-image">
-                      <img src={item.images[0]} alt={item.name} />
+                      <img src={itemImage} alt={itemName} />
                       <span className="item-qty-badge">{item.quantity}</span>
                     </div>
                     <div className="checkout-item-details">
-                      <h4>{item.name}</h4>
+                      <h4>{itemName}</h4>
                       <span>Size: {item.selectedSize} {item.selectedColor ? `| Color: ${item.selectedColor}` : ''}</span>
                     </div>
                     <span className="checkout-item-total-price">₹{itemPrice * item.quantity}</span>

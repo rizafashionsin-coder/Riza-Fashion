@@ -7,6 +7,7 @@ export default function CheckoutFlow({
   isOpen,
   onClose,
   cart,
+  products = [],
   activeCoupon,
   onClearCart,
   onPlaceOrder,
@@ -44,7 +45,10 @@ export default function CheckoutFlow({
   const [isCopied, setIsCopied] = useState(false);
 
   // Calculations
-  const subtotal = cart.reduce((total, item) => total + (item.salePrice || item.price) * item.quantity, 0);
+  const subtotal = cart.reduce((total, item) => {
+    const liveProd = (products || []).find(p => p.id === item.id) || item;
+    return total + (liveProd.salePrice || liveProd.price) * item.quantity;
+  }, 0);
   
   // Dynamic Coupon Validation & State
   const [couponInput, setCouponInput] = useState('');
@@ -521,16 +525,22 @@ export default function CheckoutFlow({
               <div className="checkout-summary-sidebar">
                 <h4 className="sidebar-title">Order Summary</h4>
                 <div className="sidebar-items-list">
-                  {cart.map((item, idx) => (
-                    <div key={idx} className="sidebar-item">
-                      <img src={item.images[0]} alt={item.name} />
-                      <div className="sidebar-item-info">
-                        <h5>{item.name}</h5>
-                        <span>Qty: {item.quantity} • Size: {item.selectedSize}</span>
+                  {cart.map((item, idx) => {
+                    const liveProd = (products || []).find(p => p.id === item.id) || item;
+                    const itemPrice = liveProd.salePrice || liveProd.price;
+                    const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                    const itemName = liveProd.name || item.name;
+                    return (
+                      <div key={idx} className="sidebar-item">
+                        <img src={itemImage} alt={itemName} />
+                        <div className="sidebar-item-info">
+                          <h5>{itemName}</h5>
+                          <span>Qty: {item.quantity} • Size: {item.selectedSize}</span>
+                        </div>
+                        <span className="sidebar-item-price">₹{itemPrice * item.quantity}</span>
                       </div>
-                      <span className="sidebar-item-price">₹{(item.salePrice || item.price) * item.quantity}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                  <hr className="summary-divider" />
                  

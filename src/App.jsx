@@ -11,7 +11,6 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { subscribeToAuthState } from './services/firebaseServices';
-import { products as initialProducts } from './data/products';
 import { HelpCircle, Star, Phone, MessageSquare, ShieldCheck, Truck, RefreshCw, User } from 'lucide-react';
 
 // Import our custom boutique UI components
@@ -141,7 +140,37 @@ function HomeView({
 
           <div className="product-grid">
             {products
-              .filter(p => p.isFeatured)
+              .filter(p => p.featured === true || p.isFeatured === true)
+              .slice(0, 4)
+              .map(product => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isWishlisted={isProductWishlisted(product)}
+                  onWishlistToggle={handleWishlistToggle}
+                  onAddToCart={handleCardAddToCart}
+                  onQuickView={setActiveQuickViewProduct}
+                />
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      {/* Limited Time Offer Section */}
+      <section className="section limited-products-section bg-secondary">
+        <div className="container">
+          <div className="section-header">
+            <span className="section-subtitle">Flash Deals</span>
+            <h2 className="section-title">Limited Time Offers</h2>
+            <p className="section-description">
+              Hurry up! Grab these premium pieces on special discount before the offer expires.
+            </p>
+          </div>
+
+          <div className="product-grid">
+            {products
+              .filter(p => p.limitedOffer === true || p.isLimited === true)
               .slice(0, 4)
               .map(product => (
                 <ProductCard
@@ -159,7 +188,7 @@ function HomeView({
       </section>
 
       {/* New Arrivals Section */}
-      <section className="section new-arrivals-section bg-secondary">
+      <section className="section new-arrivals-section">
         <div className="container">
           <div className="section-header">
             <span className="section-subtitle">Fresh Drops</span>
@@ -189,7 +218,7 @@ function HomeView({
       </section>
 
       {/* Why Choose Us */}
-      <section className="section why-choose-section">
+      <section className="section why-choose-section bg-secondary">
         <div className="container">
           <div className="section-header">
             <span className="section-subtitle">Riza Assurance</span>
@@ -197,22 +226,22 @@ function HomeView({
           </div>
 
           <div className="why-grid">
-            <div className="why-card">
+            <div className="why-card" style={{ background: '#FFF' }}>
               <Star size={32} className="why-icon" />
               <h4>Premium Quality</h4>
               <p>Finest georgettes, organic cotton knits, and 18k gold plating details.</p>
             </div>
-            <div className="why-card">
+            <div className="why-card" style={{ background: '#FFF' }}>
               <ShieldCheck size={32} className="why-icon" />
               <h4>Secure Payments</h4>
               <p>Encrypted checkouts shielding card data and local UPI gateways.</p>
             </div>
-            <div className="why-card">
+            <div className="why-card" style={{ background: '#FFF' }}>
               <Truck size={32} className="why-icon" />
               <h4>Fast Delivery</h4>
               <p>Free express logistics to your doorstep on orders exceeding ₹1499.</p>
             </div>
-            <div className="why-card">
+            <div className="why-card" style={{ background: '#FFF' }}>
               <RefreshCw size={32} className="why-icon" />
               <h4>Easy Returns</h4>
               <p>No questions asked 15-day return and instant wallet replacements.</p>
@@ -488,7 +517,7 @@ export default function App() {
   }, []);
 
   // Global E-commerce States
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [deliverySettings, setDeliverySettings] = useState(null);
   const [websiteSettings, setWebsiteSettings] = useState({
@@ -669,29 +698,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync products list with Firestore and auto-seed if empty (real-time updates)
+  // Sync products list with Firestore (real-time updates)
   useEffect(() => {
     const productsQuery = collection(db, 'products');
-    const unsubscribe = onSnapshot(productsQuery, async (querySnapshot) => {
+    const unsubscribe = onSnapshot(productsQuery, (querySnapshot) => {
       const fetchedProds = [];
       querySnapshot.forEach((docSnap) => {
         fetchedProds.push({ id: docSnap.id, ...docSnap.data() });
       });
-
-      if (fetchedProds.length === 0) {
-        console.log("Firestore products collection is empty. Seeding defaults...");
-        try {
-          for (const item of initialProducts) {
-            await setDoc(doc(db, 'products', item.id), item);
-          }
-          console.log("Seeding complete!");
-        } catch (e) {
-          console.error("Failed to seed default products:", e);
-        }
-      } else {
-        console.log("Real-time synced products count:", fetchedProds.length);
-        setProducts(fetchedProds);
-      }
+      console.log("Real-time synced products count:", fetchedProds.length);
+      setProducts(fetchedProds);
     }, (err) => {
       console.error("Error listening to products collection:", err);
     });
@@ -1172,6 +1188,7 @@ export default function App() {
             <ProtectedRoute currentUser={currentUser} isAuthChecking={isAuthChecking}>
               <CheckoutPage
                 cart={cart}
+                products={products}
                 activeCoupon={activeCoupon}
                 onClearCart={handleClearCart}
                 onPlaceOrder={handlePlaceOrder}
@@ -1201,16 +1218,19 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="product-grid">
-                      {wishlist.map(product => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          isWishlisted={true}
-                          onWishlistToggle={handleWishlistToggle}
-                          onAddToCart={handleCardAddToCart}
-                          onQuickView={setActiveQuickViewProduct}
-                        />
-                      ))}
+                      {wishlist.map(wItem => {
+                        const product = products.find(p => p.id === wItem.id) || wItem;
+                        return (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isWishlisted={true}
+                            onWishlistToggle={handleWishlistToggle}
+                            onAddToCart={handleCardAddToCart}
+                            onQuickView={setActiveQuickViewProduct}
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1296,6 +1316,7 @@ export default function App() {
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         cart={cart}
+        products={products}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onCheckout={() => {
@@ -1320,6 +1341,7 @@ export default function App() {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         cart={cart}
+        products={products}
         activeCoupon={activeCoupon}
         onClearCart={handleClearCart}
         onPlaceOrder={handlePlaceOrder}

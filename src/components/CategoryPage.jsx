@@ -114,7 +114,7 @@ export default function CategoryPage({
 
     // Featured Check
     if (filterFeatured) {
-      list = list.filter(p => p.isFeatured);
+      list = list.filter(p => p.featured === true || p.isFeatured === true);
     }
 
     // Discounted Check

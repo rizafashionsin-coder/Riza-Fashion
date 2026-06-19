@@ -3,6 +3,7 @@ import { Trash2, ShoppingBag, Plus, Minus, Tag, ChevronRight } from 'lucide-reac
 
 export default function CartPage({
   cart,
+  products = [],
   onUpdateQuantity,
   onRemoveItem,
   onNavigate,
@@ -17,7 +18,8 @@ export default function CartPage({
 
   // Calculations
   const subtotal = cart.reduce((sum, item) => {
-    const price = item.salePrice || item.price;
+    const liveProd = (products || []).find(p => p.id === item.id) || item;
+    const price = liveProd.salePrice || liveProd.price;
     return sum + (price * item.quantity);
   }, 0);
 
@@ -97,18 +99,22 @@ export default function CartPage({
 
             <div className="cart-items-flow">
               {cart.map((item, idx) => {
-                const itemPrice = item.salePrice || item.price;
+                const liveProd = (products || []).find(p => p.id === item.id) || item;
+                const itemPrice = liveProd.salePrice || liveProd.price;
+                const itemOriginalPrice = liveProd.price;
+                const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                const itemName = liveProd.name || item.name;
                 return (
                   <div key={idx} className="cart-item-row">
                     
                     {/* Visual details */}
                     <div className="item-info-cell">
                       <div className="cart-item-visual">
-                        <img src={item.images[0]} alt={item.name} />
+                        <img src={itemImage} alt={itemName} />
                       </div>
                       <div className="cart-item-meta">
                         <h3 className="cart-item-name" onClick={() => onNavigate('product', null, false, false, item.id)}>
-                          {item.name}
+                          {itemName}
                         </h3>
                         <div className="cart-item-variants">
                           <span>Size: <strong>{item.selectedSize}</strong></span>
@@ -122,8 +128,8 @@ export default function CartPage({
                     {/* Unit price */}
                     <div className="item-price-cell">
                       <span className="cart-unit-price">₹{itemPrice}</span>
-                      {item.salePrice && item.salePrice < item.price && (
-                        <span className="cart-unit-original-price">₹{item.price}</span>
+                      {liveProd.salePrice && liveProd.salePrice < liveProd.price && (
+                        <span className="cart-unit-original-price">₹{itemOriginalPrice}</span>
                       )}
                     </div>
 

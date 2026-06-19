@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Star, Heart, ShoppingBag, Plus, Minus, ChevronRight, MessageSquare, AlertCircle } from 'lucide-react';
 import ProductCard from './ProductCard';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export default function ProductDetailsPage({
   productId,
@@ -13,10 +15,28 @@ export default function ProductDetailsPage({
   onQuickView,
   triggerAuthCheck
 }) {
-  // Find current product
-  const product = useMemo(() => {
-    return products.find(p => p.id === productId);
-  }, [products, productId]);
+  // Find current product from Firestore directly using product ID
+  const [product, setProduct] = useState(null);
+  const [loadingProduct, setLoadingProduct] = useState(true);
+
+  useEffect(() => {
+    if (!productId) return;
+    setLoadingProduct(true);
+    const docRef = doc(db, 'products', productId);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setProduct({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setProduct(null);
+      }
+      setLoadingProduct(false);
+    }, (err) => {
+      console.error("Failed to load product from Firestore:", err);
+      setProduct(null);
+      setLoadingProduct(false);
+    });
+    return () => unsubscribe();
+  }, [productId]);
 
   // States
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
@@ -97,6 +117,14 @@ export default function ProductDetailsPage({
       }
     }
   }, [product]);
+
+  if (loadingProduct) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="loading-spinner" style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   if (!product) {
     return (

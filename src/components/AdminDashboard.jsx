@@ -699,8 +699,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdSizes(product.sizes || []);
     setProdSizeStock(product.sizeStock || {});
     setProdStock(product.stock !== undefined ? product.stock : 100);
-    setProdFeatured(product.isFeatured || false);
-    setProdLimited(product.isLimited || false);
+    setProdFeatured(product.featured !== undefined ? product.featured : (product.isFeatured || false));
+    setProdLimited(product.limitedOffer !== undefined ? product.limitedOffer : (product.isLimited || false));
     
     let initialColors = [];
     if (product.colors && Array.isArray(product.colors)) {
@@ -887,7 +887,9 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       reviews: editingProduct ? (editingProduct.reviews || []) : [],
       isNew: editingProduct ? (editingProduct.isNew || false) : true,
       isFeatured: prodFeatured,
+      featured: prodFeatured,
       isLimited: prodLimited,
+      limitedOffer: prodLimited,
       stock: Number(prodStock)
     };
 

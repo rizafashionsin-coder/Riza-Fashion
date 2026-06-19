@@ -5,6 +5,7 @@ export default function CartDrawer({
   isOpen,
   onClose,
   cart,
+  products = [],
   onUpdateQuantity,
   onRemoveItem,
   onCheckout,
@@ -19,7 +20,10 @@ export default function CartDrawer({
   if (!isOpen) return null;
 
   // Calculations
-  const subtotal = cart.reduce((total, item) => total + (item.salePrice || item.price) * item.quantity, 0);
+  const subtotal = cart.reduce((total, item) => {
+    const liveProd = (products || []).find(p => p.id === item.id) || item;
+    return total + (liveProd.salePrice || liveProd.price) * item.quantity;
+  }, 0);
   
   let discountAmount = 0;
   let couponLabel = '';
@@ -100,18 +104,21 @@ export default function CartDrawer({
           ) : (
             <div className="cart-items-scroller">
               {cart.map((item, idx) => {
-                const itemPrice = item.salePrice || item.price;
+                const liveProd = (products || []).find(p => p.id === item.id) || item;
+                const itemPrice = liveProd.salePrice || liveProd.price;
+                const itemImage = liveProd.images ? liveProd.images[0] : item.images[0];
+                const itemName = liveProd.name || item.name;
                 return (
                   <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}-${idx}`} className="cart-item">
                     
                     {/* Item Image */}
                     <div className="cart-item-img-box">
-                      <img src={item.images[0]} alt={item.name} />
+                      <img src={itemImage} alt={itemName} />
                     </div>
 
                     {/* Item Info */}
                     <div className="cart-item-details">
-                      <h4 className="cart-item-name">{item.name}</h4>
+                      <h4 className="cart-item-name">{itemName}</h4>
                       
                       <div className="cart-item-variants">
                         {item.selectedSize && (
