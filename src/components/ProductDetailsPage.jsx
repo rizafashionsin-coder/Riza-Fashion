@@ -159,6 +159,29 @@ export default function ProductDetailsPage({
     }
   }, [product]);
 
+  // Related products (same category, excluding current product)
+  const relatedProducts = useMemo(() => {
+    if (!product) return [];
+    return products
+      .filter(p => p.category === product.category && p.id !== product.id)
+      .slice(0, 4);
+  }, [products, product]);
+
+  // Recently viewed products
+  const recentlyViewed = useMemo(() => {
+    if (!product) return [];
+    try {
+      const ids = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+      // Map to full product objects, excluding current product
+      return ids
+        .map(id => products.find(p => p.id === id))
+        .filter(p => p && p.id !== product.id)
+        .slice(0, 4);
+    } catch {
+      return [];
+    }
+  }, [products, product]);
+
   if (loadingProduct) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -179,27 +202,6 @@ export default function ProductDetailsPage({
       </div>
     );
   }
-
-  // Related products (same category, excluding current product)
-  const relatedProducts = useMemo(() => {
-    return products
-      .filter(p => p.category === product.category && p.id !== product.id)
-      .slice(0, 4);
-  }, [products, product]);
-
-  // Recently viewed products
-  const recentlyViewed = useMemo(() => {
-    try {
-      const ids = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
-      // Map to full product objects, excluding current product
-      return ids
-        .map(id => products.find(p => p.id === id))
-        .filter(p => p && p.id !== product.id)
-        .slice(0, 4);
-    } catch {
-      return [];
-    }
-  }, [products, product]);
 
   // Zoom mouse hover handler
   const handleMouseMove = (e) => {
