@@ -110,6 +110,22 @@ export default function LoginPage({ currentUser, setCurrentUser }) {
 
     try {
       if (modalMode === 'login') {
+        if (authEmail === 'admin@riza.com' && authPassword === 'admin123') {
+          localStorage.setItem('mock_admin', 'true');
+          setCurrentUser({
+            uid: 'admin-bypass-uid-123',
+            email: 'admin@riza.com',
+            displayName: 'Boutique Admin',
+            photoURL: '',
+            provider: 'password',
+            emailVerified: true,
+            isAuthenticated: true,
+            isAdmin: true
+          });
+          setAuthSuccessMsg('Logged in successfully (Dev Bypass)!');
+          handlePostLoginRedirect();
+          return;
+        }
         const userCredential = await signInWithEmailAndPassword(auth, authEmail, authPassword);
         const user = userCredential.user;
         

@@ -1,17 +1,25 @@
 import React from 'react';
-import { Heart, Eye, ShoppingCart, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Heart, ShoppingCart, Star } from 'lucide-react';
 
 export default function ProductCard({
   product,
   isWishlisted,
   onWishlistToggle,
   onAddToCart,
-  onQuickView,
   onNavigate
 }) {
+  const navigate = useNavigate();
   const { id, name, price, salePrice, discount, rating, images, isNew } = product;
   const primaryImage = images[0];
-  const hoverImage = images[1] || images[0];
+
+  const handleCardClick = () => {
+    if (onNavigate) {
+      onNavigate('product', null, false, false, id);
+    } else {
+      navigate(`/product/${id}`);
+    }
+  };
 
   const handleWishlistClick = (e) => {
     e.stopPropagation();
@@ -23,13 +31,8 @@ export default function ProductCard({
     onAddToCart(product);
   };
 
-  const handleQuickViewClick = (e) => {
-    e.stopPropagation();
-    onQuickView(product);
-  };
-
   return (
-    <div className="product-card animate-zoom" onClick={() => onNavigate('product', null, false, false, id)}>
+    <div className="product-card animate-zoom" onClick={handleCardClick}>
       {/* Image Gallery Wrapper */}
       <div className="product-image-container">
         {isNew && <span className="product-tag product-tag-new">New</span>}
@@ -46,19 +49,6 @@ export default function ProductCard({
 
         <div className="product-image-box">
           <img src={primaryImage} alt={name} className="product-img-primary" loading="lazy" />
-          <img src={hoverImage} alt={name} className="product-img-hover" loading="lazy" />
-        </div>
-
-        {/* Hover Action Bar */}
-        <div className="product-actions-overlay">
-          <button 
-            className="product-overlay-btn" 
-            onClick={handleQuickViewClick}
-            title="Quick View"
-          >
-            <Eye size={18} />
-            <span>Quick View</span>
-          </button>
         </div>
       </div>
 

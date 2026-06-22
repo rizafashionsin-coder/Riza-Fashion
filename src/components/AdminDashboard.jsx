@@ -164,6 +164,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [catDescription, setCatDescription] = useState('');
   const [catOffer, setCatOffer] = useState('');
   const [catImage, setCatImage] = useState('');
+  const [catOrder, setCatOrder] = useState('');
 
   // Coupon modal & form states
   const [coupons, setCoupons] = useState([]);
@@ -419,6 +420,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setCatDescription('');
     setCatOffer('');
     setCatImage('');
+    setCatOrder('');
     setFormError('');
     setFormSuccess('');
     setIsCategoryModalOpen(true);
@@ -431,6 +433,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setCatDescription(category.description || '');
     setCatOffer(category.offer || '');
     setCatImage(category.image || '');
+    setCatOrder(category.order !== undefined ? category.order : '');
     setFormError('');
     setFormSuccess('');
     setIsCategoryModalOpen(true);
@@ -461,7 +464,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       name: catName.trim(),
       description: catDescription.trim(),
       offer: catOffer.trim(),
-      image: catImage.trim()
+      image: catImage.trim(),
+      order: catOrder !== '' ? Number(catOrder) : 999
     };
 
     try {
@@ -2606,6 +2610,17 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                   value={catName}
                   onChange={(e) => setCatName(e.target.value)}
                   required 
+                />
+              </div>
+
+              <div className="form-field">
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500 }}>Category Display Order (Optional)</label>
+                <input 
+                  type="number" 
+                  className="form-input" 
+                  placeholder="e.g. 1, 2, 3..."
+                  value={catOrder}
+                  onChange={(e) => setCatOrder(e.target.value)}
                 />
               </div>
 

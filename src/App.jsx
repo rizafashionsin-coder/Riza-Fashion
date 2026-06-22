@@ -20,12 +20,11 @@ import Hero from './components/Hero';
 import CategorySection from './components/CategorySection';
 import PromoBanner from './components/PromoBanner';
 import ProductCard from './components/ProductCard';
-import ProductQuickView from './components/ProductQuickView';
 import CartDrawer from './components/CartDrawer';
 import CheckoutFlow from './components/CheckoutFlow';
 
 import Testimonials from './components/Testimonials';
-import InstagramGallery from './components/InstagramGallery';
+import InstagramReelsGallery from './components/InstagramReelsGallery';
 import Newsletter from './components/Newsletter';
 import Footer from './components/Footer';
 
@@ -66,7 +65,6 @@ function CategoryPageWrapper({
   wishlist,
   onWishlistToggle,
   onAddToCart,
-  onQuickView,
   onNavigate,
   categories
 }) {
@@ -79,7 +77,6 @@ function CategoryPageWrapper({
       wishlist={wishlist}
       onWishlistToggle={onWishlistToggle}
       onAddToCart={onAddToCart}
-      onQuickView={onQuickView}
       onNavigate={onNavigate}
       categories={categories}
     />
@@ -93,7 +90,6 @@ function ProductDetailsPageWrapper({
   onAddToCart,
   onNavigate,
   onAddReview,
-  onQuickView,
   triggerAuthCheck
 }) {
   const { productId } = useParams();
@@ -106,7 +102,6 @@ function ProductDetailsPageWrapper({
       onAddToCart={onAddToCart}
       onNavigate={onNavigate}
       onAddReview={onAddReview}
-      onQuickView={onQuickView}
       triggerAuthCheck={triggerAuthCheck}
     />
   );
@@ -117,13 +112,12 @@ function HomeView({
   isProductWishlisted,
   handleWishlistToggle,
   handleCardAddToCart,
-  setActiveQuickViewProduct,
   handleNavigate,
   categories
 }) {
   return (
     <div className="page-home animate-fade">
-      <Hero onNavigate={handleNavigate} />
+      <Hero onNavigate={handleNavigate} categories={categories} />
       <CategorySection onNavigate={handleNavigate} categories={categories} />
       <PromoBanner onNavigate={handleNavigate} />
       
@@ -149,7 +143,7 @@ function HomeView({
                   isWishlisted={isProductWishlisted(product)}
                   onWishlistToggle={handleWishlistToggle}
                   onAddToCart={handleCardAddToCart}
-                  onQuickView={setActiveQuickViewProduct}
+                  onNavigate={handleNavigate}
                 />
               ))
             }
@@ -179,7 +173,7 @@ function HomeView({
                   isWishlisted={isProductWishlisted(product)}
                   onWishlistToggle={handleWishlistToggle}
                   onAddToCart={handleCardAddToCart}
-                  onQuickView={setActiveQuickViewProduct}
+                  onNavigate={handleNavigate}
                 />
               ))
             }
@@ -209,7 +203,7 @@ function HomeView({
                   isWishlisted={isProductWishlisted(product)}
                   onWishlistToggle={handleWishlistToggle}
                   onAddToCart={handleCardAddToCart}
-                  onQuickView={setActiveQuickViewProduct}
+                  onNavigate={handleNavigate}
                 />
               ))
             }
@@ -251,7 +245,7 @@ function HomeView({
       </section>
 
       <Testimonials />
-      <InstagramGallery />
+      <InstagramReelsGallery />
       <Newsletter />
     </div>
   );
@@ -480,6 +474,18 @@ export default function App() {
 
   // Sync with Auth Listener
   useEffect(() => {
+    if (localStorage.getItem('mock_admin') === 'true') {
+      setCurrentUser({
+        uid: 'admin-bypass-uid-123',
+        email: 'admin@riza.com',
+        displayName: 'Boutique Admin',
+        photoURL: '',
+        isAuthenticated: true,
+        isAdmin: true
+      });
+      setIsAuthChecking(false);
+      return;
+    }
     const unsubscribe = subscribeToAuthState(async (user) => {
       try {
         if (user.isAuthenticated) {
@@ -528,7 +534,7 @@ export default function App() {
       mobileNumber: "+91 98765 43210",
       whatsAppNumber: "919876543210",
       businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
-      instagramLink: "https://instagram.com",
+      instagramLink: "https://www.instagram.com/rizafashions.in",
       facebookLink: "https://facebook.com",
       youtubeLink: "https://youtube.com"
     },
@@ -551,7 +557,7 @@ export default function App() {
           mobileNumber: "+91 98765 43210",
           whatsAppNumber: "919876543210",
           businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
-          instagramLink: "https://instagram.com",
+          instagramLink: "https://www.instagram.com/rizafashions.in",
           facebookLink: "https://facebook.com",
           youtubeLink: "https://youtube.com"
         },
@@ -671,12 +677,12 @@ export default function App() {
       if (catsList.length === 0) {
         console.log("Firestore categories collection is empty. Seeding defaults from App.jsx...");
         const defaultCategories = [
-          { id: 'sarees', name: 'Sarees', description: 'Elegant drapes & silk fabrics', offer: 'Flat 10% OFF', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' },
-          { id: 'kurtis', name: 'Kurtis', description: 'Ethnic and modern wear fusion', offer: 'New Season', image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=600&q=80' },
-          { id: 'maxi', name: 'Maxi Dresses', description: 'Flowing silhouettes for dinners', offer: 'Up to 30% OFF', image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=600&q=80' },
-          { id: 'nightwear', name: 'Night Wears', description: 'Unwind in pure satin and cotton', offer: 'Buy 2 Get 1', image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80' },
-          { id: 'hijabs', name: 'Hijabs', description: 'Breathable premium wraps', offer: 'Starting ₹399', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80' },
-          { id: 'accessories', name: 'Accessories', description: 'Luxury handbags & pendant sets', offer: 'Rose Gold Plated', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80' }
+          { id: 'sarees', name: 'Sarees', description: 'Elegant drapes & silk fabrics', offer: 'Flat 10% OFF', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80', order: 1 },
+          { id: 'kurtis', name: 'Kurtis', description: 'Ethnic and modern wear fusion', offer: 'New Season', image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=600&q=80', order: 2 },
+          { id: 'maxi', name: 'Maxi Dresses', description: 'Flowing silhouettes for dinners', offer: 'Up to 30% OFF', image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=600&q=80', order: 3 },
+          { id: 'nightwear', name: 'Night Wears', description: 'Unwind in pure satin and cotton', offer: 'Buy 2 Get 1', image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80', order: 6 },
+          { id: 'hijabs', name: 'Hijabs', description: 'Breathable premium wraps', offer: 'Starting ₹399', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80', order: 4 },
+          { id: 'accessories', name: 'Accessories', description: 'Luxury handbags & pendant sets', offer: 'Rose Gold Plated', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80', order: 5 }
         ];
         
         try {
@@ -688,8 +694,21 @@ export default function App() {
           console.error("Failed to seed default categories:", e);
         }
       } else {
+        const defaultOrderMap = {
+          sarees: 1,
+          kurtis: 2,
+          maxi: 3,
+          hijabs: 4,
+          accessories: 5,
+          nightwear: 6
+        };
         // Sort categories to maintain consistent display order
-        catsList.sort((a, b) => a.id.localeCompare(b.id));
+        catsList.sort((a, b) => {
+          const orderA = a.order !== undefined ? Number(a.order) : (defaultOrderMap[a.id] || 999);
+          const orderB = b.order !== undefined ? Number(b.order) : (defaultOrderMap[b.id] || 999);
+          if (orderA !== orderB) return orderA - orderB;
+          return a.id.localeCompare(b.id);
+        });
         setCategories(catsList);
       }
     }, (err) => {
@@ -773,7 +792,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [activeQuickViewProduct, setActiveQuickViewProduct] = useState(null);
+
 
 
 
@@ -996,19 +1015,7 @@ export default function App() {
       })
     );
     
-    // Also sync the currently active quick view product so review shows instantly
-    setActiveQuickViewProduct(prev => {
-      if (prev && prev.id === productId) {
-        const updatedReviews = [reviewObj, ...prev.reviews];
-        const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
-        return {
-          ...prev,
-          reviews: updatedReviews,
-          rating: totalRating / updatedReviews.length
-        };
-      }
-      return prev;
-    });
+
   };
 
   // 5. Coupon Handling & Revalidation
@@ -1162,7 +1169,6 @@ export default function App() {
               isProductWishlisted={isProductWishlisted}
               handleWishlistToggle={handleWishlistToggle}
               handleCardAddToCart={handleCardAddToCart}
-              setActiveQuickViewProduct={setActiveQuickViewProduct}
               handleNavigate={handleNavigate}
               categories={categories}
             />
@@ -1174,7 +1180,6 @@ export default function App() {
               wishlist={wishlist}
               onWishlistToggle={handleWishlistToggle}
               onAddToCart={handleCardAddToCart}
-              onQuickView={setActiveQuickViewProduct}
               onNavigate={handleNavigate}
               categories={categories}
             />
@@ -1186,7 +1191,6 @@ export default function App() {
               wishlist={wishlist}
               onWishlistToggle={handleWishlistToggle}
               onAddToCart={handleCardAddToCart}
-              onQuickView={setActiveQuickViewProduct}
               onNavigate={handleNavigate}
               categories={categories}
             />
@@ -1200,7 +1204,6 @@ export default function App() {
               onAddToCart={handleAddToCart}
               onNavigate={handleNavigate}
               onAddReview={handleAddReview}
-              onQuickView={setActiveQuickViewProduct}
               triggerAuthCheck={triggerAuthCheck}
             />
           } />
@@ -1262,7 +1265,7 @@ export default function App() {
                             isWishlisted={true}
                             onWishlistToggle={handleWishlistToggle}
                             onAddToCart={handleCardAddToCart}
-                            onQuickView={setActiveQuickViewProduct}
+                            onNavigate={handleNavigate}
                           />
                         );
                       })}
@@ -1385,19 +1388,6 @@ export default function App() {
         deliverySettings={deliverySettings}
       />
 
-      {/* Quick View Details Modal */}
-      {activeQuickViewProduct && (
-        <ProductQuickView
-          product={activeQuickViewProduct}
-          onClose={() => setActiveQuickViewProduct(null)}
-          onAddToCart={handleAddToCart}
-          allProducts={products}
-          onQuickView={setActiveQuickViewProduct}
-          isWishlisted={isProductWishlisted(activeQuickViewProduct)}
-          onWishlistToggle={handleWishlistToggle}
-          onAddReview={handleAddReview}
-        />
-      )}
 
       {/* Account Login Drawer Mockup */}
       {isAccountOpen && (
@@ -1455,7 +1445,9 @@ export default function App() {
                   className="btn btn-secondary btn-block" 
                   onClick={async () => {
                     try {
+                      localStorage.removeItem('mock_admin');
                       await signOut(auth);
+                      setCurrentUser(null);
                       setIsAccountOpen(false);
                     } catch (err) {
                       console.error("Signout error:", err);
@@ -1496,6 +1488,24 @@ export default function App() {
 
                     try {
                       if (modalMode === 'login') {
+                        if (authEmail === 'admin@riza.com' && authPassword === 'admin123') {
+                          localStorage.setItem('mock_admin', 'true');
+                          setCurrentUser({
+                            uid: 'admin-bypass-uid-123',
+                            email: 'admin@riza.com',
+                            displayName: 'Boutique Admin',
+                            photoURL: '',
+                            isAuthenticated: true,
+                            isAdmin: true
+                          });
+                          setAuthSuccessMsg('Logged in successfully (Dev Bypass)!');
+                          setTimeout(() => {
+                            setIsAccountOpen(false);
+                            setAuthEmail('');
+                            setAuthPassword('');
+                          }, 800);
+                          return;
+                        }
                         // Firebase Log In
                         await signInWithEmailAndPassword(auth, authEmail, authPassword);
                         setAuthSuccessMsg('Logged in successfully!');

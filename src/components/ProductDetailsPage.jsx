@@ -12,7 +12,6 @@ export default function ProductDetailsPage({
   onAddToCart,
   onNavigate,
   onAddReview,
-  onQuickView,
   triggerAuthCheck
 }) {
   // Find current product from Firestore directly using product ID
@@ -627,7 +626,6 @@ export default function ProductDetailsPage({
                   isWishlisted={wishlist.some(item => item.id === p.id)}
                   onWishlistToggle={onWishlistToggle}
                   onAddToCart={onAddToCart}
-                  onQuickView={onQuickView}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -649,7 +647,6 @@ export default function ProductDetailsPage({
                   isWishlisted={wishlist.some(item => item.id === p.id)}
                   onWishlistToggle={onWishlistToggle}
                   onAddToCart={onAddToCart}
-                  onQuickView={onQuickView}
                   onNavigate={onNavigate}
                 />
               ))}

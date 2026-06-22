@@ -8,7 +8,6 @@ export default function CategoryPage({
   wishlist,
   onWishlistToggle,
   onAddToCart,
-  onQuickView,
   onNavigate,
   categories
 }) {
@@ -385,7 +384,6 @@ export default function CategoryPage({
                       isWishlisted={wishlistSet.has(product.id)}
                       onWishlistToggle={onWishlistToggle}
                       onAddToCart={onAddToCart}
-                      onQuickView={onQuickView}
                       onNavigate={onNavigate}
                     />
                   ))}

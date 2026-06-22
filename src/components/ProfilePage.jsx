@@ -19,6 +19,7 @@ export default function ProfilePage({ currentUser, setCurrentUser, onNavigate })
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('mock_admin');
       await signOut(auth);
       setCurrentUser(null);
       onNavigate('home');

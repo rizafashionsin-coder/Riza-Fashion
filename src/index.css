@@ -1531,7 +1531,7 @@ textarea.form-input {
 }
 
 .product-card:hover {
-  transform: translateY(-5px);
+  transform: scale(1.02);
   box-shadow: var(--shadow-md);
   border-color: var(--border-medium);
 }
@@ -1559,20 +1559,11 @@ textarea.form-input {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: var(--transition-slow);
-}
-
-.product-img-hover {
-  opacity: 0;
-}
-
-.product-card:hover .product-img-hover {
-  opacity: 1;
-  transform: scale(1.04);
+  transition: 0.3s ease;
 }
 
 .product-card:hover .product-img-primary {
-  opacity: 0;
+  transform: scale(1.03);
 }
 
 /* Badges / Tags */
@@ -1630,44 +1621,6 @@ textarea.form-input {
   background-color: var(--secondary);
 }
 
-/* Actions Overlay overlaying bottom of image */
-.product-actions-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding: 15px;
-  background: linear-gradient(to top, rgba(45, 45, 45, 0.45) 0%, rgba(45, 45, 45, 0) 100%);
-  display: flex;
-  justify-content: center;
-  transform: translateY(100%);
-  transition: var(--transition-normal);
-  z-index: 4;
-}
-
-.product-card:hover .product-actions-overlay {
-  transform: translateY(0);
-}
-
-.product-overlay-btn {
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(4px);
-  color: var(--charcoal);
-  padding: 8px 16px;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: var(--transition-fast);
-}
-
-.product-overlay-btn:hover {
-  background-color: var(--primary);
-  color: var(--secondary);
-}
 
 /* Info styling */
 .product-info {
@@ -3817,85 +3770,45 @@ textarea.form-input {
   border-radius: var(--radius-pill);
 }
 
-/* Instagram Section Styles */
-.instagram-grid {
+
+
+/* Instagram Reels Section Styles */
+.instagram-reels-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 40px;
 }
 
 @media (max-width: 1024px) {
-  .instagram-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .instagram-grid {
+  .instagram-reels-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 20px;
   }
 }
 
-.instagram-grid-item {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  display: block;
+@media (max-width: 768px) {
+  .instagram-reels-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-width: 450px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
-.instagram-grid-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: var(--transition-slow);
+.instagram-reel-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
 }
 
-.instagram-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(45, 45, 45, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: var(--transition-normal);
-  z-index: 2;
-  color: var(--secondary);
+.instagram-link:hover {
+  text-decoration: underline !important;
+  opacity: 0.9;
 }
 
-.instagram-grid-item:hover .instagram-overlay {
-  opacity: 1;
-}
 
-.instagram-grid-item:hover img {
-  transform: scale(1.06);
-}
-
-.overlay-elements-row {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.likes-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.insta-icon {
-  animation: float 6s ease-in-out infinite;
-}
 
 /* Newsletter Section Styles */
 .newsletter-card {

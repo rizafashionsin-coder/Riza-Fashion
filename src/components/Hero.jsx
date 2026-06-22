@@ -1,70 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
-const slides = [
-  {
-    id: 'sarees',
-    name: 'Sarees',
-    tagline: 'Exquisite Heritage Organza & Silk',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)', // Soft Lavender
-    accentColor: '#B06BB3',
-    glowColor: 'rgba(176, 107, 179, 0.4)',
-    textTag: 'Sarees'
-  },
-  {
-    id: 'kurtis',
-    name: 'Kurtis',
-    tagline: 'Fusion of Ethnic Chikankari & Modern Flair',
-    image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #FFF1F3 0%, #FAD0D6 100%)', // Soft Rose Pink
-    accentColor: '#D8A7B1', // Rose Gold Accent
-    glowColor: 'rgba(216, 167, 177, 0.45)',
-    textTag: 'Kurtis'
-  },
-  {
-    id: 'maxi',
-    name: 'Maxis',
-    tagline: 'Flowing Silhouettes for Modern Evenings',
-    image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #FAF2F3 0%, #E8C1C7 100%)', // Dusty Rose
-    accentColor: '#C58A96',
-    glowColor: 'rgba(197, 138, 150, 0.4)',
-    textTag: 'Maxi'
-  },
-  {
-    id: 'nightwear',
-    name: 'Night Wears',
-    tagline: 'Slip Into Unrivaled Satin Loungewear',
-    image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #F6EFF9 0%, #D7BDE2 100%)', // Light Purple
-    accentColor: '#8E4F90',
-    glowColor: 'rgba(142, 79, 144, 0.4)',
-    textTag: 'Nightwear'
-  },
-  {
-    id: 'hijabs',
-    name: 'Hijabs',
-    tagline: 'Lightweight & Breathable Premium Drapes',
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)', // Cream + Beige
-    accentColor: '#C4A484', // Warm Beige Accent
-    glowColor: 'rgba(196, 164, 132, 0.4)',
-    textTag: 'Hijabs'
-  },
-  {
-    id: 'accessories',
-    name: 'Accessories',
-    tagline: 'Luxury Crossbodies & Fine Jewelry Pieces',
-    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80',
-    gradient: 'linear-gradient(135deg, #FCFAF4 0%, #F0E6D2 100%)', // Luxury Gold Tint
-    accentColor: '#D4AF37', // Gold Accent
-    glowColor: 'rgba(212, 175, 55, 0.4)',
-    textTag: 'Accessories'
-  }
-];
-
-// Coordinate bubble offsets surrounding model on desktop (refined organic floating layout)
 const bubbleCoordinates = [
   { top: '15%', left: '-5%' },  // Index 0: Sarees (top-left)
   { top: '22%', right: '-4%' }, // Index 1: Kurtis (top-right)
@@ -74,25 +10,133 @@ const bubbleCoordinates = [
   { top: '50%', right: '-6%' }  // Index 5: Accessories (center-right)
 ];
 
-export default function Hero({ onNavigate }) {
+const presetStyles = {
+  sarees: {
+    gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)', // Soft Lavender
+    accentColor: '#B06BB3',
+    glowColor: 'rgba(176, 107, 179, 0.4)',
+    tagline: 'Exquisite Heritage Organza & Silk'
+  },
+  kurtis: {
+    gradient: 'linear-gradient(135deg, #FFF1F3 0%, #FAD0D6 100%)', // Soft Rose Pink
+    accentColor: '#D8A7B1', // Rose Gold Accent
+    glowColor: 'rgba(216, 167, 177, 0.45)',
+    tagline: 'Fusion of Ethnic Chikankari & Modern Flair'
+  },
+  maxi: {
+    gradient: 'linear-gradient(135deg, #FAF2F3 0%, #E8C1C7 100%)', // Dusty Rose
+    accentColor: '#C58A96',
+    glowColor: 'rgba(197, 138, 150, 0.4)',
+    tagline: 'Flowing Silhouettes for Modern Evenings'
+  },
+  nightwear: {
+    gradient: 'linear-gradient(135deg, #F6EFF9 0%, #D7BDE2 100%)', // Light Purple
+    accentColor: '#8E4F90',
+    glowColor: 'rgba(142, 79, 144, 0.4)',
+    tagline: 'Slip Into Unrivaled Satin Loungewear'
+  },
+  hijabs: {
+    gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)', // Cream + Beige
+    accentColor: '#C4A484', // Warm Beige Accent
+    glowColor: 'rgba(196, 164, 132, 0.4)',
+    tagline: 'Lightweight & Breathable Premium Drapes'
+  },
+  accessories: {
+    gradient: 'linear-gradient(135deg, #FCFAF4 0%, #F0E6D2 100%)', // Luxury Gold Tint
+    accentColor: '#D4AF37', // Gold Accent
+    glowColor: 'rgba(212, 175, 55, 0.4)',
+    tagline: 'Luxury Crossbodies & Fine Jewelry Pieces'
+  }
+};
+
+export default function Hero({ onNavigate, categories }) {
+  const displayCategories = categories && categories.length > 0 ? categories : [
+    {
+      id: 'sarees',
+      name: 'Sarees',
+      image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80',
+      description: 'Elegant drapes & silk fabrics'
+    },
+    {
+      id: 'kurtis',
+      name: 'Kurtis',
+      image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=800&q=80',
+      description: 'Ethnic and modern wear fusion'
+    },
+    {
+      id: 'maxi',
+      name: 'Maxis',
+      image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=800&q=80',
+      description: 'Flowing silhouettes for dinners'
+    },
+    {
+      id: 'nightwear',
+      name: 'Night Wears',
+      image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80',
+      description: 'Unwind in pure satin and cotton'
+    },
+    {
+      id: 'hijabs',
+      name: 'Hijabs',
+      image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80',
+      description: 'Breathable premium wraps'
+    },
+    {
+      id: 'accessories',
+      name: 'Accessories',
+      image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80',
+      description: 'Luxury handbags & pendant sets'
+    }
+  ];
+
+  const slides = displayCategories.map(cat => {
+    const stylePreset = presetStyles[cat.id] || {
+      gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)',
+      accentColor: '#B06BB3',
+      glowColor: 'rgba(176, 107, 179, 0.3)',
+      tagline: cat.description || 'Premium Custom Collection'
+    };
+    return {
+      id: cat.id,
+      name: cat.name,
+      tagline: stylePreset.tagline,
+      image: cat.image,
+      gradient: stylePreset.gradient,
+      accentColor: stylePreset.accentColor,
+      glowColor: stylePreset.glowColor,
+      textTag: cat.name
+    };
+  });
+
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
   
-  const activeSlide = slides[activeIndex];
+  const activeIndexBounded = activeIndex < slides.length ? activeIndex : 0;
+  const activeSlide = slides[activeIndexBounded] || {
+    id: 'default',
+    name: 'Collection',
+    tagline: 'Premium Women\'s Wear Collection',
+    image: '',
+    gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)',
+    accentColor: '#B06BB3',
+    glowColor: 'rgba(176, 107, 179, 0.3)',
+    textTag: 'Collection'
+  };
+  
   const timerRef = useRef(null);
 
   // Autoplay intervals (4.5s) - pauses on mouse hover
   useEffect(() => {
-    if (!isHovered) {
+    if (!isHovered && slides.length > 0) {
       timerRef.current = setInterval(() => {
-        setActiveIndex(prev => (prev === slides.length - 1 ? 0 : prev + 1));
+        setActiveIndex(prev => (prev >= slides.length - 1 ? 0 : prev + 1));
       }, 4500);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isHovered]);
+  }, [isHovered, slides.length]);
 
   // Handle manual category switches
   const handleCategorySwitch = (idx) => {
@@ -214,15 +258,15 @@ export default function Hero({ onNavigate }) {
                 key={slide.id}
                 src={slide.image}
                 alt={slide.name}
-                className={`showcase-model-img ${activeIndex === idx ? 'visible' : ''}`}
+                className={`showcase-model-img ${activeIndexBounded === idx ? 'visible' : ''}`}
                 loading="eager"
               />
             ))}
           </div>
 
           {/* Desktop Circular Floating Category Nodes */}
-          {slides.map((slide, idx) => {
-            const isActive = activeIndex === idx;
+          {slides.slice(0, 6).map((slide, idx) => {
+            const isActive = activeIndexBounded === idx;
             return (
               <button
                 key={slide.id}
@@ -231,11 +275,15 @@ export default function Hero({ onNavigate }) {
                   ...bubbleCoordinates[idx],
                   transform: `translate(${mouseOffset.x * 1.5}px, ${mouseOffset.y * 1.5}px)`,
                   '--glow-color': slide.glowColor,
-                  '--accent-color': slide.accentColor
+                  '--accent-color': slide.accentColor,
+                  backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55)), url(${slide.image})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
                 }}
-                onClick={() => handleCategorySwitch(idx)}
+                onMouseEnter={() => handleCategorySwitch(idx)}
+                onClick={() => onNavigate('shop', slide.id)}
               >
-                <span className="node-text">{slide.textTag}</span>
+                <span className="node-text" style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{slide.textTag}</span>
               </button>
             );
           })}
@@ -248,13 +296,13 @@ export default function Hero({ onNavigate }) {
       <div className="mobile-category-swiper-bar">
         <div className="swiper-scroller no-scrollbar">
           {slides.map((slide, idx) => {
-            const isActive = activeIndex === idx;
+            const isActive = activeIndexBounded === idx;
             return (
               <button
                 key={slide.id}
                 className={`swiper-pill-btn ${isActive ? 'active' : ''}`}
                 style={isActive ? { backgroundColor: slide.accentColor, color: '#fff' } : {}}
-                onClick={() => handleCategorySwitch(idx)}
+                onClick={() => onNavigate('shop', slide.id)}
               >
                 {slide.name}
               </button>
