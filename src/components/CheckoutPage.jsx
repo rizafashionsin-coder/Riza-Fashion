@@ -51,22 +51,6 @@ export default function CheckoutPage({
     }
   }, []);
 
-  // Meta Pixel InitiateCheckout tracking
-  useEffect(() => {
-    if (window.fbq && selectedCheckoutItems.length > 0) {
-      window.fbq('track', 'InitiateCheckout', {
-        value: subtotal,
-        currency: 'INR',
-        content_ids: selectedCheckoutItems.map(item => item.id),
-        content_type: 'product',
-        contents: selectedCheckoutItems.map(item => ({
-          id: item.id,
-          quantity: item.quantity
-        }))
-      });
-    }
-  }, [selectedCheckoutItems, subtotal]);
-
   // Load Buy Now item if it exists
   const buyNowInfo = useMemo(() => {
     try {
@@ -125,6 +109,22 @@ export default function CheckoutPage({
     const price = liveProd.salePrice || liveProd.price;
     return sum + (price * item.quantity);
   }, 0);
+
+  // Meta Pixel InitiateCheckout tracking
+  useEffect(() => {
+    if (window.fbq && selectedCheckoutItems.length > 0) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: subtotal,
+        currency: 'INR',
+        content_ids: selectedCheckoutItems.map(item => item.id),
+        content_type: 'product',
+        contents: selectedCheckoutItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity
+        }))
+      });
+    }
+  }, [selectedCheckoutItems, subtotal]);
 
   // Dynamic Coupon Validation & State
   const [couponInput, setCouponInput] = useState('');
