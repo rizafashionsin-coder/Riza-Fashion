@@ -278,6 +278,9 @@ export default function App() {
   // Scroll to top smoothly on route change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (window.fbq) {
+      window.fbq('track', 'PageView');
+    }
   }, [location.pathname]);
 
   // Sync scroll and path on navigating
@@ -837,6 +840,17 @@ export default function App() {
     
     // Show quick feedback
     setIsCartOpen(true);
+
+    // Meta Pixel AddToCart event tracking
+    if (window.fbq) {
+      window.fbq('track', 'AddToCart', {
+        content_name: cartItem.name,
+        content_ids: [cartItem.id],
+        content_type: 'product',
+        value: (cartItem.salePrice || cartItem.price || 0) * (cartItem.quantity || 1),
+        currency: 'INR'
+      });
+    }
   };
 
   // Standard cart card addition trigger (sets defaults for size/color)

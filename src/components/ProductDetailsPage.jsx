@@ -155,6 +155,17 @@ export default function ProductDetailsPage({
       } catch (err) {
         console.error("localStorage access failed:", err);
       }
+
+      // Meta Pixel ViewContent event tracking
+      if (window.fbq) {
+        window.fbq('track', 'ViewContent', {
+          content_name: product.name,
+          content_ids: [product.id],
+          content_type: 'product',
+          value: product.salePrice || product.price || 0,
+          currency: 'INR'
+        });
+      }
     }
   }, [product]);
 

@@ -51,6 +51,22 @@ export default function CheckoutPage({
     }
   }, []);
 
+  // Meta Pixel InitiateCheckout tracking
+  useEffect(() => {
+    if (window.fbq && selectedCheckoutItems.length > 0) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: subtotal,
+        currency: 'INR',
+        content_ids: selectedCheckoutItems.map(item => item.id),
+        content_type: 'product',
+        contents: selectedCheckoutItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity
+        }))
+      });
+    }
+  }, [selectedCheckoutItems, subtotal]);
+
   // Load Buy Now item if it exists
   const buyNowInfo = useMemo(() => {
     try {
@@ -374,6 +390,20 @@ export default function CheckoutPage({
           orderStatus: 'Pending',
           razorpayPaymentId: response.razorpay_payment_id
         };
+
+        // Meta Pixel Purchase tracking
+        if (window.fbq) {
+          window.fbq('track', 'Purchase', {
+            value: finalTotal,
+            currency: 'INR',
+            content_ids: selectedCheckoutItems.map(item => item.id),
+            content_type: 'product',
+            contents: selectedCheckoutItems.map(item => ({
+              id: item.id,
+              quantity: item.quantity
+            }))
+          });
+        }
 
         onPlaceOrder(orderId, finalOrder);
         clearSelectedItems();
