@@ -67,6 +67,7 @@ export default function ProductDetailsPage({
   }, [product, selectedColor]);
 
   // Selected size's live stock quantity
+  // Selected size's live stock quantity
   const selectedVariantStock = useMemo(() => {
     if (!product || !selectedColor || !selectedSize) return 0;
     if (product.variants && Array.isArray(product.variants)) {
@@ -76,6 +77,42 @@ export default function ProductDetailsPage({
     // Backward compatibility fallback
     return product.sizeStock && product.sizeStock[selectedSize] !== undefined ? product.sizeStock[selectedSize] : 0;
   }, [product, selectedColor, selectedSize]);
+
+  // Selected variant-specific title / name
+  const currentTitle = useMemo(() => {
+    if (!product) return '';
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.name) {
+        return variant.name;
+      }
+    }
+    return product.name || '';
+  }, [product, selectedColor]);
+
+  // Selected variant-specific description
+  const currentDescription = useMemo(() => {
+    if (!product) return '';
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.description) {
+        return variant.description;
+      }
+    }
+    return product.description || '';
+  }, [product, selectedColor]);
+
+  // Selected variant-specific specifications / details
+  const currentDetails = useMemo(() => {
+    if (!product) return [];
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.details && variant.details.length > 0) {
+        return variant.details;
+      }
+    }
+    return product.details || [];
+  }, [product, selectedColor]);
 
   // Handle color change (image swap + auto-adjust sizes)
   const handleColorChange = (colorName) => {
@@ -104,6 +141,44 @@ export default function ProductDetailsPage({
         }
         const nextValidSizes = colObj.sizes 
           ? (product.sizes || []).filter(sz => colObj.sizes.includes(sz))
+          : product.sizes || [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
+      }
+    }
+  };
+
+  // Handle thumbnail image click and auto-adjust color variant
+  const handleImageChange = (idx) => {
+    setSelectedImageIdx(idx);
+    
+    // Find a variant that matches the selected image index
+    if (product.variants && Array.isArray(product.variants)) {
+      const matchingVariant = product.variants.find(v => v.imageIndex === idx);
+      if (matchingVariant) {
+        setSelectedColor(matchingVariant.colorName);
+        const nextValidSizes = matchingVariant.sizes ? Object.keys(matchingVariant.sizes) : [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
+      }
+    } else if (product.colors && Array.isArray(product.colors)) {
+      // Backward compatibility fallback
+      const matchingCol = product.colors.find(c => (typeof c === 'object' && c.imageIndex === idx));
+      if (matchingCol) {
+        const colName = typeof matchingCol === 'string' ? matchingCol : matchingCol.name;
+        setSelectedColor(colName);
+        const nextValidSizes = matchingCol.sizes 
+          ? (product.sizes || []).filter(sz => matchingCol.sizes.includes(sz))
           : product.sizes || [];
         if (nextValidSizes.length > 0) {
           if (!nextValidSizes.includes(selectedSize)) {
@@ -305,7 +380,7 @@ export default function ProductDetailsPage({
                 <button
                   key={idx}
                   className={`gallery-thumb-btn ${selectedImageIdx === idx ? 'active' : ''}`}
-                  onClick={() => setSelectedImageIdx(idx)}
+                  onClick={() => handleImageChange(idx)}
                 >
                   <img src={img} alt={`${product.name} View ${idx + 1}`} />
                 </button>
@@ -336,7 +411,7 @@ export default function ProductDetailsPage({
           {/* Right: Buy Column */}
           <div className="product-meta-container animate-fade">
             <span className="meta-category">{product.category}</span>
-            <h1 className="meta-title">{product.name}</h1>
+            <h1 className="meta-title">{currentTitle}</h1>
             
             {/* Review and Stars row */}
             <div className="meta-reviews-summary">
@@ -370,7 +445,7 @@ export default function ProductDetailsPage({
               )}
             </div>
 
-            <p className="meta-short-description">{product.description}</p>
+            <p className="meta-short-description">{currentDescription}</p>
 
             {/* Variant options */}
             <div className="product-variants-section">
@@ -498,11 +573,11 @@ export default function ProductDetailsPage({
 
             {/* Assurances highlights */}
             <div className="meta-specifications-box">
-              {product.details && product.details.length > 0 && (
+              {currentDetails && currentDetails.length > 0 && (
                 <div className="details-highlights">
                   <h4>Product Specifications</h4>
                   <ul className="spec-list">
-                    {product.details.map((detail, idx) => (
+                    {currentDetails.map((detail, idx) => (
                       <li key={idx}>{detail}</li>
                     ))}
                   </ul>

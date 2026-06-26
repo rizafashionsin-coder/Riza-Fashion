@@ -703,7 +703,11 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     
     let initialVariants = [];
     if (product.variants && Array.isArray(product.variants)) {
-      initialVariants = product.variants;
+      initialVariants = product.variants.map(v => ({
+        ...v,
+        description: v.description || '',
+        details: v.details ? (Array.isArray(v.details) ? v.details.join('\n') : v.details) : ''
+      }));
     } else if (product.colors && Array.isArray(product.colors)) {
       // Migrate old colors & sizeStock/sizes to the new variants matrix
       initialVariants = product.colors.map(col => {
@@ -880,6 +884,26 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       ? prodDetails.split('\n').map(d => d.trim()).filter(Boolean) 
       : [];
 
+    const sanitizedVariants = prodVariants.map(v => {
+      let variantDetailsArray = [];
+      if (v.details) {
+        if (Array.isArray(v.details)) {
+          variantDetailsArray = v.details.map(d => d.trim()).filter(Boolean);
+        } else if (typeof v.details === 'string') {
+          variantDetailsArray = v.details.split('\n').map(d => d.trim()).filter(Boolean);
+        }
+      }
+      return {
+        colorName: v.colorName,
+        colorCode: v.colorCode,
+        imageIndex: v.imageIndex,
+        sizes: v.sizes,
+        name: v.name ? v.name.trim() : '',
+        description: v.description ? v.description.trim() : '',
+        details: variantDetailsArray
+      };
+    });
+
     const totalStock = prodVariants.reduce((sum, v) => {
       return sum + Object.values(v.sizes || {}).reduce((sSum, qty) => sSum + Number(qty), 0);
     }, 0);
@@ -891,7 +915,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       salePrice: salePrice,
       discount: discount >= 0 ? discount : 0,
       description: prodDescription,
-      variants: prodVariants,
+      variants: sanitizedVariants,
       details: detailsArray,
       images: prodImages,
       rating: editingProduct ? (editingProduct.rating || 5.0) : 5.0,
@@ -2413,6 +2437,51 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                                     );
                                   })}
                                 </div>
+                              </div>
+
+                              {/* Variant-specific Title */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                <label style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Variant Title / Name (Optional):</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="Leave blank to use default product name..."
+                                  value={col.name || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setProdVariants(prev => prev.map((c, i) => i === idx ? { ...c, name: val } : c));
+                                  }}
+                                  style={{ padding: '6px 10px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                                />
+                              </div>
+
+                              {/* Variant-specific Description */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                <label style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Variant Description (Optional):</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="Leave blank to use default product description..."
+                                  value={col.description || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setProdVariants(prev => prev.map((c, i) => i === idx ? { ...c, description: val } : c));
+                                  }}
+                                  style={{ padding: '6px 10px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
+                                />
+                              </div>
+
+                              {/* Variant-specific Specs / Details */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                                <label style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Variant Specs / Details (Optional, One detail per line):</label>
+                                <textarea 
+                                  placeholder="e.g. Fabric: Premium Organza Silk&#10;Work: Embroidered Silver Zari Border&#10;Care: Dry clean only"
+                                  rows="2"
+                                  value={col.details || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setProdVariants(prev => prev.map((c, i) => i === idx ? { ...c, details: val } : c));
+                                  }}
+                                  style={{ padding: '6px 10px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF', fontFamily: 'inherit' }}
+                                />
                               </div>
                             </div>
                           ))}

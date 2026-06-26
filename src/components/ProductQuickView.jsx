@@ -52,6 +52,42 @@ export default function ProductQuickView({
     return product.sizeStock && product.sizeStock[selectedSize] !== undefined ? product.sizeStock[selectedSize] : 0;
   }, [product, selectedColor, selectedSize]);
 
+  // Selected variant-specific title / name
+  const currentTitle = React.useMemo(() => {
+    if (!product) return '';
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.name) {
+        return variant.name;
+      }
+    }
+    return product.name || '';
+  }, [product, selectedColor]);
+
+  // Selected variant-specific description
+  const currentDescription = React.useMemo(() => {
+    if (!product) return '';
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.description) {
+        return variant.description;
+      }
+    }
+    return product.description || '';
+  }, [product, selectedColor]);
+
+  // Selected variant-specific specifications / details
+  const currentDetails = React.useMemo(() => {
+    if (!product) return [];
+    if (product.variants && Array.isArray(product.variants) && selectedColor) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.details && variant.details.length > 0) {
+        return variant.details;
+      }
+    }
+    return product.details || [];
+  }, [product, selectedColor]);
+
   // Handle color change (image swap + auto-adjust sizes)
   const handleColorChange = (colorName) => {
     setSelectedColor(colorName);
@@ -79,6 +115,44 @@ export default function ProductQuickView({
         }
         const nextValidSizes = colObj.sizes 
           ? (product.sizes || []).filter(sz => colObj.sizes.includes(sz))
+          : product.sizes || [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
+      }
+    }
+  };
+
+  // Handle thumbnail image click and auto-adjust color variant
+  const handleImageChange = (idx) => {
+    setActiveImageIdx(idx);
+    
+    // Find a variant that matches the selected image index
+    if (product.variants && Array.isArray(product.variants)) {
+      const matchingVariant = product.variants.find(v => v.imageIndex === idx);
+      if (matchingVariant) {
+        setSelectedColor(matchingVariant.colorName);
+        const nextValidSizes = matchingVariant.sizes ? Object.keys(matchingVariant.sizes) : [];
+        if (nextValidSizes.length > 0) {
+          if (!nextValidSizes.includes(selectedSize)) {
+            setSelectedSize(nextValidSizes[0]);
+          }
+        } else {
+          setSelectedSize('');
+        }
+      }
+    } else if (product.colors && Array.isArray(product.colors)) {
+      // Backward compatibility fallback
+      const matchingCol = product.colors.find(c => (typeof c === 'object' && c.imageIndex === idx));
+      if (matchingCol) {
+        const colName = typeof matchingCol === 'string' ? matchingCol : matchingCol.name;
+        setSelectedColor(colName);
+        const nextValidSizes = matchingCol.sizes 
+          ? (product.sizes || []).filter(sz => matchingCol.sizes.includes(sz))
           : product.sizes || [];
         if (nextValidSizes.length > 0) {
           if (!nextValidSizes.includes(selectedSize)) {
@@ -208,7 +282,7 @@ export default function ProductQuickView({
                   <button
                     key={idx}
                     className={`thumbnail-btn ${activeImageIdx === idx ? 'active' : ''}`}
-                    onClick={() => setActiveImageIdx(idx)}
+                    onClick={() => handleImageChange(idx)}
                   >
                     <img src={img} alt={`Thumbnail ${idx}`} />
                   </button>
@@ -220,7 +294,7 @@ export default function ProductQuickView({
           {/* Column 2: Details */}
           <div className="modal-details-col">
             <span className="details-category-tag">{product.category.toUpperCase()}</span>
-            <h2 className="details-title">{product.name}</h2>
+            <h2 className="details-title">{currentTitle}</h2>
             
             {/* Ratings Header */}
             <div className="details-rating-row">
@@ -257,14 +331,16 @@ export default function ProductQuickView({
             </div>
 
             {/* Description */}
-            <p className="details-description">{product.description}</p>
+            <p className="details-description">{currentDescription}</p>
 
             {/* Specifications bullet points */}
-            <ul className="details-bullets">
-              {product.details.map((bullet, idx) => (
-                <li key={idx}>{bullet}</li>
-              ))}
-            </ul>
+            {currentDetails && currentDetails.length > 0 && (
+              <ul className="details-bullets">
+                {currentDetails.map((bullet, idx) => (
+                  <li key={idx}>{bullet}</li>
+                ))}
+              </ul>
+            )}
 
             {/* Product Variants Pickers */}
             <div className="variants-container">
