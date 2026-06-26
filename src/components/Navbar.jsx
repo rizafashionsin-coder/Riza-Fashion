@@ -183,6 +183,15 @@ export default function Navbar({
             {/* Auth Links */}
             {currentUser ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
+                {(currentUser.isAdmin || currentUser.email === 'admin@riza.com') && (
+                  <button
+                    className="navbar-link"
+                    onClick={() => navigate('/admin')}
+                    style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)' }}
+                  >
+                    Admin Panel
+                  </button>
+                )}
                 <button
                   className="navbar-link"
                   onClick={() => navigate('/profile')}
@@ -268,6 +277,15 @@ export default function Navbar({
             <div style={{ margin: '15px 0', borderTop: '1px solid var(--border-light)' }}></div>
             {currentUser ? (
               <>
+                {(currentUser.isAdmin || currentUser.email === 'admin@riza.com') && (
+                  <button
+                    className="drawer-link"
+                    onClick={() => { setIsMobileMenuOpen(false); navigate('/admin'); }}
+                    style={{ fontWeight: 600, color: 'var(--primary)' }}
+                  >
+                    Admin Panel
+                  </button>
+                )}
                 <button
                   className="drawer-link"
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }}
