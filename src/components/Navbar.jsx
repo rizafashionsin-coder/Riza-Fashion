@@ -44,8 +44,9 @@ export default function Navbar({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const dynamicLinks = categories && categories.length > 0
-    ? categories.map(cat => ({ label: cat.name, view: 'shop', category: cat.id }))
+  const activeCategories = categories ? categories.filter(cat => cat.active !== false) : [];
+  const dynamicLinks = activeCategories.length > 0
+    ? activeCategories.map(cat => ({ label: cat.name, view: 'shop', category: cat.id }))
     : [
         { label: 'Sarees', view: 'shop', category: 'sarees' },
         { label: 'Kurtis', view: 'shop', category: 'kurtis' },

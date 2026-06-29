@@ -170,7 +170,8 @@ export default function CategoryPage({
     setSortBy('featured');
   };
 
-  const categoriesList = categories && categories.length > 0 ? categories : [
+  const activeCategories = categories ? categories.filter(cat => cat.active !== false) : [];
+  const categoriesList = activeCategories.length > 0 ? activeCategories : [
     { id: 'sarees', name: 'Sarees' },
     { id: 'kurtis', name: 'Kurtis' },
     { id: 'maxi', name: 'Maxi Dresses' },

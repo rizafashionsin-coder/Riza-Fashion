@@ -165,6 +165,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [catOffer, setCatOffer] = useState('');
   const [catImage, setCatImage] = useState('');
   const [catOrder, setCatOrder] = useState('');
+  const [catActive, setCatActive] = useState(true);
 
   // Coupon modal & form states
   const [coupons, setCoupons] = useState([]);
@@ -421,6 +422,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setCatOffer('');
     setCatImage('');
     setCatOrder('');
+    setCatActive(true);
     setFormError('');
     setFormSuccess('');
     setIsCategoryModalOpen(true);
@@ -434,6 +436,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setCatOffer(category.offer || '');
     setCatImage(category.image || '');
     setCatOrder(category.order !== undefined ? category.order : '');
+    setCatActive(category.active !== false);
     setFormError('');
     setFormSuccess('');
     setIsCategoryModalOpen(true);
@@ -465,7 +468,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       description: catDescription.trim(),
       offer: catOffer.trim(),
       image: catImage.trim(),
-      order: catOrder !== '' ? Number(catOrder) : 999
+      order: catOrder !== '' ? Number(catOrder) : 999,
+      active: catActive
     };
 
     try {
@@ -1417,11 +1421,15 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                   <div key={cat.id} style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-sm)' }}>
                     <div style={{ position: 'relative', height: '140px', background: '#F5F5F5' }}>
                       <img src={cat.image} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      {cat.offer && (
+                      {cat.active === false ? (
+                        <span style={{ position: 'absolute', top: '10px', left: '10px', background: '#ECEFF1', color: '#546E7A', fontSize: '0.7rem', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                          Inactive
+                        </span>
+                      ) : cat.offer ? (
                         <span style={{ position: 'absolute', top: '10px', left: '10px', background: 'var(--accent)', color: 'var(--charcoal)', fontSize: '0.7rem', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
                           {cat.offer}
                         </span>
-                      )}
+                      ) : null}
                       <span style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', color: '#FFF', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
                         slug: {cat.id}
                       </span>
@@ -2754,6 +2762,17 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                     />
                   </label>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                <input 
+                  type="checkbox" 
+                  id="catActiveCheckbox"
+                  checked={catActive}
+                  onChange={(e) => setCatActive(e.target.checked)}
+                  style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="catActiveCheckbox" style={{ fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer' }}>Active (Show category on website)</label>
               </div>
             </div>
 

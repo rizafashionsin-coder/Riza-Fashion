@@ -2,7 +2,8 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 
 export default function CategorySection({ onNavigate, categories }) {
-  const displayCategories = categories && categories.length > 0 ? categories : [
+  const activeCategories = categories ? categories.filter(cat => cat.active !== false) : [];
+  const displayCategories = activeCategories.length > 0 ? activeCategories : [
     {
       id: 'sarees',
       name: 'Sarees',
