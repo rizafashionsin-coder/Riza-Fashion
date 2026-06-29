@@ -236,7 +236,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       ];
 
   // Sizes choices
-  const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+  const sizeOptions = ['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
   // Default categories for seeding
   const defaultCategories = [
