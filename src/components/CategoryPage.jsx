@@ -11,57 +11,23 @@ export default function CategoryPage({
   onNavigate,
   categories
 }) {
-  // Category configurations
-  const categoryConfigs = {
-    sarees: {
-      title: "Sarees Collection",
-      description: "Experience the timeless grace of Indian heritage. Our sarees are meticulously crafted from premium organza, Katan silk, and georgette, featuring hand-embroidered silver and gold zari work.",
-      image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=80"
-    },
-    kurtis: {
-      title: "Kurtis & Anarkalis",
-      description: "A gorgeous fusion of ethnic craftsmanship and modern fashion. Explore pleated Anarkalis, knee-length kurtis, and georgette sets detailed with traditional Chikankari lace work.",
-      image: "https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=1200&q=80"
-    },
-    maxi: {
-      title: "Maxi Gowns & Dresses",
-      description: "Drape yourself in fluid luxury. Featuring heavy satin crepe maxi dresses and abstract floral chiffon tiers, designed for upscale evenings, cocktail parties, and celebrations.",
-      image: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80"
-    },
-    nightwear: {
-      title: "Satin & Cotton Night Wears",
-      description: "Cozy evenings meet luxurious comfort. Relax in our premium button-up satin pyjama lounge sets and ribbed organic cotton wide-leg trouser sets, finished with contrast piping.",
-      image: "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=1200&q=80"
-    },
-    hijabs: {
-      title: "Premium Hijabs & Wraps",
-      description: "Breathable, lightweight, and structured to prevent slipping. Woven from high-grade bubble chiffon and bamboo modal crimps, hand-hemmed for formal and daily wear.",
-      image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1200&q=80"
-    },
-    accessories: {
-      title: "Luxury Accessories",
-      description: "The finishing touch for the elegant soul. Elevate your silhouette with 18k rose gold-plated cubic zirconia necklace pendants, studs, and saffiano vegan leather crossbody clutches.",
-      image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1200&q=80"
-    }
-  };
-
   const matchedDbCategory = categories?.find(cat => cat.id === categoryName);
   
   const isAllProducts = !categoryName || categoryName === 'all';
 
   const currentConfig = isAllProducts ? {
     title: "All Collections",
-    description: "Browse our complete catalog of premium fashion — from luxurious sarees and kurtis to elegant maxi dresses, nightwear, hijabs, and accessories.",
+    description: "Browse our complete catalog of premium fashion.",
     image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
   } : matchedDbCategory ? {
     title: matchedDbCategory.name,
     description: matchedDbCategory.description || "Explore our premium fashion silhouettes designed to celebrate your unique identity.",
     image: matchedDbCategory.image || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
-  } : (categoryConfigs[categoryName] || {
-    title: "Shop All Collections",
+  } : {
+    title: categoryName ? categoryName.charAt(0).toUpperCase() + categoryName.slice(1) : "Collection",
     description: "Explore our premium fashion silhouettes designed to celebrate your unique identity.",
     image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80"
-  });
+  };
 
   // Filter States
   const [searchVal, setSearchVal] = useState('');

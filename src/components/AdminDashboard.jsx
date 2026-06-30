@@ -224,30 +224,11 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  // Available categories options (dynamic with static fallback)
-  const categoriesList = categories.length > 0 
-    ? categories.map(cat => ({ value: cat.id, label: cat.name }))
-    : [
-        { value: 'sarees', label: 'Sarees' },
-        { value: 'kurtis', label: 'Kurtis' },
-        { value: 'maxi', label: 'Maxi Dresses' },
-        { value: 'nightwear', label: 'Night Wears' },
-        { value: 'hijabs', label: 'Hijabs' },
-        { value: 'accessories', label: 'Accessories' }
-      ];
+  // Available categories options
+  const categoriesList = categories.map(cat => ({ value: cat.id, label: cat.name }));
 
   // Sizes choices
   const sizeOptions = ['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-
-  // Default categories for seeding
-  const defaultCategories = [
-    { id: 'sarees', name: 'Sarees', description: 'Elegant drapes & silk fabrics', offer: 'Flat 10% OFF', image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80' },
-    { id: 'kurtis', name: 'Kurtis', description: 'Ethnic and modern wear fusion', offer: 'New Season', image: 'https://images.unsplash.com/photo-1608930261073-455b55021571?auto=format&fit=crop&w=600&q=80' },
-    { id: 'maxi', name: 'Maxi Dresses', description: 'Flowing silhouettes for dinners', offer: 'Up to 30% OFF', image: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=600&q=80' },
-    { id: 'nightwear', name: 'Night Wears', description: 'Unwind in pure satin and cotton', offer: 'Buy 2 Get 1', image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80' },
-    { id: 'hijabs', name: 'Hijabs', description: 'Breathable premium wraps', offer: 'Starting ₹399', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80' },
-    { id: 'accessories', name: 'Accessories', description: 'Luxury handbags & pendant sets', offer: 'Rose Gold Plated', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80' }
-  ];
 
   // Load Website Settings & Policies from Firestore
   useEffect(() => {

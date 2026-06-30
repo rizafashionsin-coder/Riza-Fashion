@@ -114,22 +114,11 @@ export default function Footer({ onNavigate, settings, categories }) {
         <div className="footer-col">
           <h4>Categories</h4>
           <ul className="footer-links-list">
-            {categories && categories.length > 0 ? (
-              categories.filter(cat => cat.active !== false).map(cat => (
-                <li key={cat.id}>
-                  <button onClick={() => handleLinkClick('shop', cat.id)}>{cat.name}</button>
-                </li>
-              ))
-            ) : (
-              <>
-                <li><button onClick={() => handleLinkClick('shop', 'sarees')}>Sarees Collection</button></li>
-                <li><button onClick={() => handleLinkClick('shop', 'kurtis')}>Kurtis & Anarkalis</button></li>
-                <li><button onClick={() => handleLinkClick('shop', 'maxi')}>Maxi Gowns</button></li>
-                <li><button onClick={() => handleLinkClick('shop', 'nightwear')}>Satin Night Wears</button></li>
-                <li><button onClick={() => handleLinkClick('shop', 'hijabs')}>Premium Hijabs</button></li>
-                <li><button onClick={() => handleLinkClick('shop', 'accessories')}>Women Accessories</button></li>
-              </>
-            )}
+            {categories && categories.filter(cat => cat.active !== false).map(cat => (
+              <li key={cat.id}>
+                <button onClick={() => handleLinkClick('shop', cat.id)}>{cat.name}</button>
+              </li>
+            ))}
           </ul>
         </div>
 

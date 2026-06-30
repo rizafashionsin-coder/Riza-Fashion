@@ -81,7 +81,7 @@ export default function CartPage({
           <ShoppingBag size={64} className="empty-icon" style={{ marginBottom: '20px', color: 'var(--primary-light)' }} />
           <h2>Your Cart is Empty</h2>
           <p>You haven't added any luxury pieces to your cart yet. Explore our premium collections to get started.</p>
-          <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={() => onNavigate('shop', 'sarees')}>
+          <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={() => onNavigate('shop', 'all')}>
             Explore Collections
           </button>
         </div>
