@@ -733,19 +733,10 @@ The orders for the user are shipped through registered domestic courier companie
       querySnapshot.forEach((doc) => {
         catsList.push({ id: doc.id, ...doc.data() });
       });
-      
-      const defaultOrderMap = {
-        sarees: 1,
-        kurtis: 2,
-        maxi: 3,
-        hijabs: 4,
-        accessories: 5,
-        nightwear: 6
-      };
       // Sort categories to maintain consistent display order
       catsList.sort((a, b) => {
-        const orderA = a.order !== undefined ? Number(a.order) : (defaultOrderMap[a.id] || 999);
-        const orderB = b.order !== undefined ? Number(b.order) : (defaultOrderMap[b.id] || 999);
+        const orderA = a.order !== undefined ? Number(a.order) : 999;
+        const orderB = b.order !== undefined ? Number(b.order) : 999;
         if (orderA !== orderB) return orderA - orderB;
         return a.id.localeCompare(b.id);
       });
