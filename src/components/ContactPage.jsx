@@ -6,10 +6,10 @@ export default function ContactPage({ onNavigate, settings }) {
     businessName: "Riza Fashions",
     businessEmail: "care@rizafashions.com",
     customerSupportEmail: "support@rizafashions.com",
-    mobileNumber: "+91 98765 43210",
-    whatsAppNumber: "919876543210",
-    businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
-    instagramLink: "https://instagram.com",
+    mobileNumber: "+91 96006 29335",
+    whatsAppNumber: "919600629335",
+    businessAddress: "Riswana Begam 70B,K.Chokkanathapuram,Sivaganga,Tamilnadu,Pincode- 630313",
+    instagramLink: "https://www.instagram.com/rizafashions.in",
     facebookLink: "https://facebook.com",
     youtubeLink: "https://youtube.com"
   };

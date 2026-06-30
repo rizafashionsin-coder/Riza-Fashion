@@ -23,7 +23,7 @@ import ProductCard from './components/ProductCard';
 import CartDrawer from './components/CartDrawer';
 import CheckoutFlow from './components/CheckoutFlow';
 
-import Testimonials from './components/Testimonials';
+// import Testimonials from './components/Testimonials';
 import InstagramReelsGallery from './components/InstagramReelsGallery';
 import Newsletter from './components/Newsletter';
 import Footer from './components/Footer';
@@ -244,7 +244,7 @@ function HomeView({
         </div>
       </section>
 
-      <Testimonials />
+      {/* <Testimonials /> */}
       <InstagramReelsGallery />
       <Newsletter />
     </div>
@@ -548,7 +548,7 @@ export default function App() {
     shippingPolicy: { content: "" }
   });
 
-  // Fetch website settings & policies from Firestore and auto-seed if empty or missing
+  // Fetch website settings & policies from Firestore; fall back to local defaults if empty or missing
   useEffect(() => {
     const websiteSettingsCol = collection(db, 'websiteSettings');
     const unsubscribe = onSnapshot(websiteSettingsCol, async (snapshot) => {
@@ -557,9 +557,9 @@ export default function App() {
           businessName: "Riza Fashions",
           businessEmail: "care@rizafashions.com",
           customerSupportEmail: "support@rizafashions.com",
-          mobileNumber: "+91 98765 43210",
-          whatsAppNumber: "919876543210",
-          businessAddress: "102, Lavender Boulevard, Fashion District, Mumbai, 400001",
+          mobileNumber: "+91 96006 29335",
+          whatsAppNumber: "919600629335",
+          businessAddress: "Riswana Begam 70B,K.Chokkanathapuram,Sivaganga,Tamilnadu,Pincode- 630313",
           instagramLink: "https://www.instagram.com/rizafashions.in",
           facebookLink: "https://facebook.com",
           youtubeLink: "https://youtube.com"
@@ -568,7 +568,7 @@ export default function App() {
         privacyPolicy: { content: `PRIVACY POLICY
 
 Introduction
-This Privacy Policy describes how RISWANA FASHION and its affiliates (collectively "RISWANA FASHION", "we", "our", "us") collect, use, share, protect or otherwise process your information/ personal data through our website https://rizafashions.in/ (hereinafter referred to as Platform). Please note that you may be able to browse certain sections of the Platform without registering with us. We do not offer any product/service under this Platform outside India and your personal data will primarily be stored and processed in India. By visiting this Platform, providing your information or availing any product/service offered on the Platform, you expressly agree to be bound by the terms and conditions of this Privacy Policy, the Terms of Use and the applicable service/product terms and conditions, and agree to be governed by the laws of India including but not limited to the laws applicable to data protection and privacy. If you do not agree please do not use or access our Platform.
+This Privacy Policy describes how Riswana Begam and its affiliates (collectively "Riswana Begam", "we", "our", "us") collect, use, share, protect or otherwise process your information/ personal data through our website https://rizafashions.in/ (hereinafter referred to as Platform). Please note that you may be able to browse certain sections of the Platform without registering with us. We do not offer any product/service under this Platform outside India and your personal data will primarily be stored and processed in India. By visiting this Platform, providing your information or availing any product/service offered on the Platform, you expressly agree to be bound by the terms and conditions of this Privacy Policy, the Terms of Use and the applicable service/product terms and conditions, and agree to be governed by the laws of India including but not limited to the laws applicable to data protection and privacy. If you do not agree please do not use or access our Platform.
 
 Collection - We collect your personal data when you use our Platform, services or otherwise interact with us during the course of our relationship and related information provided from time to time. Some of the information that we may collect includes but is not limited to personal data / information provided to us during sign-up/registering or using our Platform such as name, date of birth, address, telephone/mobile number, email ID and/or any such information shared as proof of identity or address. Some of the sensitive personal data may be collected with your consent, such as your bank account or credit or debit card or other payment instrument information or biometric information such as your facial features or physiological information (in order to enable use of certain features when opted for, available on the Platform) etc. all of the above being in accordance with applicable law(s). You always have the option to not provide information, by choosing not to use a particular service or feature on the Platform. We may track your behaviour, preferences, and other information that you choose to provide on our Platform. This information is compiled and analysed on an aggregated basis. We will also collect your information related to your transactions on Platform and such third-party business partner platforms. When such a third-party business partner collects your personal data directly from you, you will be governed by their privacy policies. We shall not be responsible for the third-party business partner’s privacy practices or the content of their privacy policies, and we request you to read their privacy policies prior to disclosing any information. If you receive an email, a call from a person/association claiming to be RISWANA FASHION seeking any personal data like debit/credit card PIN, net-banking or mobile banking password, we request you to never provide such information. If you have already revealed such information, report it immediately to an appropriate law enforcement agency.
 
@@ -641,6 +641,11 @@ The orders for the user are shipped through registered domestic courier companie
       snapshot.forEach(docSnap => {
         settingsData[docSnap.id] = docSnap.data();
       });
+      const oldRefundPolicyContent = "We offer a 15-day return and exchange policy on all unused garments. To be eligible for a return, your item must be in the same condition that you received it, unworn or unused, with tags, and in its original packaging. Refund replacements or wallet credits are processed immediately upon inspection.";
+      const oldShippingPolicyContent = "We provide free express logistics to your doorstep on orders exceeding ₹1499. Orders below the threshold are subject to shipping charges depending on your delivery address. Orders are processed within 1-2 business days and typically delivered within 3-5 business days across India.";
+      const oldTermsConditionsContent = "Welcome to Riza Fashions. These Terms & Conditions outline the rules and regulations for the use of Riza Fashions' Website. By accessing this website, we assume you accept these terms and conditions in full. Do not continue to use Riza Fashions' website if you do not accept all of the terms and conditions stated on this page.";
+      const oldPrivacyPolicyContent = "Your privacy is important to us. This Privacy Policy describes how Riza Fashions collects, uses, and shares your personal information when you visit or make a purchase from our website. We secure your personal information and transaction details through encrypted gateways.";
+
       for (const [key, value] of Object.entries(defaults)) {
         const docExists = settingsData[key];
         const isOldDefault = docExists && (
