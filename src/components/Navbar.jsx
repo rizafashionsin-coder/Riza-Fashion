@@ -45,16 +45,7 @@ export default function Navbar({
   }, []);
 
   const activeCategories = categories ? categories.filter(cat => cat.active !== false) : [];
-  const dynamicLinks = activeCategories.length > 0
-    ? activeCategories.map(cat => ({ label: cat.name, view: 'shop', category: cat.id }))
-    : [
-        { label: 'Sarees', view: 'shop', category: 'sarees' },
-        { label: 'Kurtis', view: 'shop', category: 'kurtis' },
-        { label: 'Maxi', view: 'shop', category: 'maxi' },
-        { label: 'Night Wears', view: 'shop', category: 'nightwear' },
-        { label: 'Hijabs', view: 'shop', category: 'hijabs' },
-        { label: 'Accessories', view: 'shop', category: 'accessories' }
-      ];
+  const dynamicLinks = activeCategories.map(cat => ({ label: cat.name, view: 'shop', category: cat.id }));
 
   const navLinks = [
     { label: 'Home', view: 'home' },

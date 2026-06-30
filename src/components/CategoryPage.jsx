@@ -169,16 +169,8 @@ export default function CategoryPage({
     setFilterInStock(true);
     setSortBy('featured');
   };
-
   const activeCategories = categories ? categories.filter(cat => cat.active !== false) : [];
-  const categoriesList = activeCategories.length > 0 ? activeCategories : [
-    { id: 'sarees', name: 'Sarees' },
-    { id: 'kurtis', name: 'Kurtis' },
-    { id: 'maxi', name: 'Maxi Dresses' },
-    { id: 'nightwear', name: 'Night Wears' },
-    { id: 'hijabs', name: 'Hijabs' },
-    { id: 'accessories', name: 'Accessories' }
-  ];
+  const categoriesList = activeCategories;
 
   const wishlistSet = useMemo(() => new Set(wishlist.map(p => p.id)), [wishlist]);
 
