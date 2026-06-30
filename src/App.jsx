@@ -641,14 +641,6 @@ The orders for the user are shipped through registered domestic courier companie
       snapshot.forEach(docSnap => {
         settingsData[docSnap.id] = docSnap.data();
       });
-
-      // Check if any default settings are missing or matching old defaults, and seed/upgrade them
-      let missingSeeded = false;
-      const oldRefundPolicyContent = "We offer a 15-day return and exchange policy on all unused garments. To be eligible for a return, your item must be in the same condition that you received it, unworn or unused, with tags, and in its original packaging. Refund replacements or wallet credits are processed immediately upon inspection.";
-      const oldShippingPolicyContent = "We provide free express logistics to your doorstep on orders exceeding ₹1499. Orders below the threshold are subject to shipping charges depending on your delivery address. Orders are processed within 1-2 business days and typically delivered within 3-5 business days across India.";
-      const oldTermsConditionsContent = "Welcome to Riza Fashions. These Terms & Conditions outline the rules and regulations for the use of Riza Fashions' Website. By accessing this website, we assume you accept these terms and conditions in full. Do not continue to use Riza Fashions' website if you do not accept all of the terms and conditions stated on this page.";
-      const oldPrivacyPolicyContent = "Your privacy is important to us. This Privacy Policy describes how Riza Fashions collects, uses, and shares your personal information when you visit or make a purchase from our website. We secure your personal information and transaction details through encrypted gateways.";
-
       for (const [key, value] of Object.entries(defaults)) {
         const docExists = settingsData[key];
         const isOldDefault = docExists && (
@@ -659,85 +651,71 @@ The orders for the user are shipped through registered domestic courier companie
         );
 
         if (!docExists || isOldDefault) {
-          console.log(`Seeding websiteSettings document: ${key}`);
-          try {
-            await setDoc(doc(db, 'websiteSettings', key), value);
-            missingSeeded = true;
-          } catch (e) {
-            console.error(`Failed to seed ${key}:`, e);
-          }
+          settingsData[key] = value;
         }
       }
 
-      if (!missingSeeded) {
-        setWebsiteSettings(prev => ({
-          ...prev,
-          ...settingsData
-        }));
-      }
+      setWebsiteSettings(prev => ({
+        ...prev,
+        ...settingsData
+      }));
     }, (err) => {
       console.error("Error listening to websiteSettings:", err);
     });
     return () => unsubscribe();
   }, []);
 
-  // Fetch delivery settings from Firestore and auto-seed defaults if missing
+  // Fetch delivery settings from Firestore
   useEffect(() => {
     const deliveryDocRef = doc(db, 'settings', 'delivery');
-    const unsubscribe = onSnapshot(deliveryDocRef, async (docSnap) => {
-      if (!docSnap.exists()) {
-        console.log("Firestore delivery settings missing. Seeding defaults from App.jsx...");
-        const defaultDeliverySettings = {
-          defaultCharge: 150,
-          freeShippingThreshold: 1499,
-          charges: {
-            "chennai": 60,
-            "coimbatore": 90,
-            "madurai": 90,
-            "tiruchirappalli": 90,
-            "salem": 90,
-            "tiruppur": 90,
-            "erode": 90,
-            "vellore": 90,
-            "thanjavur": 90,
-            "dindigul": 90,
-            "ranipet": 90,
-            "tirupathur": 90,
-            "kanchipuram": 90,
-            "chengalpattu": 90,
-            "tiruvallur": 90,
-            "tiruvannamalai": 90,
-            "viluppuram": 90,
-            "kallakurichi": 90,
-            "cuddalore": 90,
-            "dharmapuri": 90,
-            "krishnagiri": 90,
-            "namakkal": 90,
-            "nilgiris": 100,
-            "karur": 90,
-            "perambalur": 90,
-            "ariyalur": 90,
-            "nagapattinam": 90,
-            "mayiladuthurai": 90,
-            "tiruvarur": 90,
-            "pudukkottai": 90,
-            "sivaganga": 90,
-            "ramanathapuram": 90,
-            "virudhunagar": 90,
-            "theni": 90,
-            "tenkasi": 90,
-            "tirunelveli": 90,
-            "thoothukudi": 90,
-            "kanyakumari": 100
-          }
-        };
-        try {
-          await setDoc(deliveryDocRef, defaultDeliverySettings);
-          console.log("Delivery settings seeded successfully!");
-          setDeliverySettings(defaultDeliverySettings);
-        } catch (e) {
-          console.error("Failed to seed delivery settings:", e);
+    const unsubscribe = onSnapshot(deliveryDocRef, (docSnap) => {
+      const defaultDeliverySettings = {
+        defaultCharge: 150,
+        freeShippingThreshold: 1499,
+        charges: {
+          "chennai": 60,
+          "coimbatore": 90,
+          "madurai": 90,
+          "tiruchirappalli": 90,
+          "salem": 90,
+          "tiruppur": 90,
+          "erode": 90,
+          "vellore": 90,
+          "thanjavur": 90,
+          "dindigul": 90,
+          "ranipet": 90,
+          "tirupathur": 90,
+          "kanchipuram": 90,
+          "chengalpattu": 90,
+          "tiruvallur": 90,
+          "tiruvannamalai": 90,
+          "viluppuram": 90,
+          "kallakurichi": 90,
+          "cuddalore": 90,
+          "dharmapuri": 90,
+          "krishnagiri": 90,
+          "namakkal": 90,
+          "nilgiris": 100,
+          "karur": 90,
+          "perambalur": 90,
+          "ariyalur": 90,
+          "nagapattinam": 90,
+          "mayiladuthurai": 90,
+          "tiruvarur": 90,
+          "pudukkottai": 90,
+          "sivaganga": 90,
+          "ramanathapuram": 90,
+          "virudhunagar": 90,
+          "theni": 90,
+          "tenkasi": 90,
+          "tirunelveli": 90,
+          "thoothukudi": 90,
+          "kanyakumari": 100
         }
+      };
+      if (!docSnap.exists()) {
+        console.log("Firestore delivery settings missing. Using in-memory defaults.");
+        setDeliverySettings(defaultDeliverySettings);
       } else {
         setDeliverySettings(docSnap.data());
       }
