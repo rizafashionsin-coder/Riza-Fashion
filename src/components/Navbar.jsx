@@ -174,7 +174,7 @@ export default function Navbar({
 
             {/* Auth Links */}
             {currentUser ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
+              <div className="navbar-auth-desktop" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
                 {(currentUser.isAdmin || currentUser.email === 'admin@riza.com') && (
                   <button
                     className="navbar-link"
@@ -207,7 +207,7 @@ export default function Navbar({
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
+              <div className="navbar-auth-desktop" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '8px' }}>
                 <button
                   className="navbar-link"
                   onClick={() => navigate('/login')}

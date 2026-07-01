@@ -101,56 +101,34 @@ export default function CustomerOrdersPage({ currentUser, onNavigate }) {
       );
     }
 
+    const activePercentage = currentStepIndex >= 0 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;
+
     return (
-      <div className="order-timeline-wrapper" style={{ margin: '12px 0 28px 0', padding: '16px 0', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '90%', margin: '0 auto' }}>
-          {/* Background Line */}
-          <div style={{ position: 'absolute', top: '15px', left: '0', right: '0', height: '4px', background: 'var(--border-medium)', zIndex: 1 }}></div>
-          
-          {/* Active Progress Line */}
-          <div style={{ 
-            position: 'absolute', 
-            top: '15px', 
-            left: '0', 
-            width: `${currentStepIndex >= 0 ? (currentStepIndex / (steps.length - 1)) * 100 : 0}%`, 
-            height: '4px', 
-            background: 'var(--primary)', 
-            zIndex: 2,
-            transition: 'width 0.4s ease'
-          }}></div>
+      <div className="order-timeline-wrapper">
+        <div className="order-timeline-steps">
+          {/* Background Line with Nested Active Line */}
+          <div className="order-timeline-line-bg">
+            <div 
+              className="order-timeline-line-active" 
+              style={{ '--active-percentage': `${activePercentage}%` }}
+            ></div>
+          </div>
 
           {steps.map((step, idx) => {
             const isCompleted = idx <= currentStepIndex;
             const isActive = idx === currentStepIndex;
             
             return (
-              <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, position: 'relative', flex: 1 }}>
+              <div 
+                key={step} 
+                className={`order-timeline-step-item ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}`}
+              >
                 {/* Dot */}
-                <div style={{ 
-                  width: '32px', 
-                  height: '32px', 
-                  borderRadius: '50%', 
-                  background: isCompleted ? 'var(--primary)' : '#FFF', 
-                  border: isCompleted ? '2px solid var(--primary)' : '2px solid var(--border-medium)',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: isCompleted ? '#FFF' : 'var(--text-muted)',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  boxShadow: isActive ? '0 0 10px rgba(156, 39, 176, 0.3)' : 'none',
-                  transition: 'all 0.3s ease'
-                }}>
+                <div className="order-timeline-step-dot">
                   {isCompleted ? '✓' : idx + 1}
                 </div>
                 {/* Label */}
-                <span style={{ 
-                  marginTop: '8px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: isCompleted ? 600 : 400,
-                  color: isCompleted ? 'var(--charcoal)' : 'var(--text-muted)',
-                  textAlign: 'center'
-                }}>
+                <span className="order-timeline-step-label">
                   {step}
                 </span>
               </div>
@@ -215,27 +193,12 @@ export default function CustomerOrdersPage({ currentUser, onNavigate }) {
             return (
               <div 
                 key={order.orderId} 
-                style={{ 
-                  background: '#FFF', 
-                  borderRadius: '12px', 
-                  border: '1px solid var(--border-light)', 
-                  overflow: 'hidden', 
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.02)' 
-                }}
+                className="order-history-card"
               >
                 {/* Header Row */}
                 <div 
-                  style={{ 
-                    background: 'var(--bg-secondary)', 
-                    padding: '20px 24px', 
-                    borderBottom: isExpanded ? '1px solid var(--border-light)' : 'none', 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    flexWrap: 'wrap', 
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}
+                  className="order-card-header"
+                  style={{ borderBottom: isExpanded ? '1px solid var(--border-light)' : 'none' }}
                   onClick={() => toggleOrderExpand(order.orderId)}
                 >
                   <div>
@@ -299,7 +262,7 @@ export default function CustomerOrdersPage({ currentUser, onNavigate }) {
 
                 {/* Details Body */}
                 {isExpanded && (
-                  <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div className="order-card-body">
                     
                     {/* Visual Status Timeline */}
                     {renderTimeline(order.orderStatus || 'Pending')}

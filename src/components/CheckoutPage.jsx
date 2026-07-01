@@ -826,7 +826,7 @@ export default function CheckoutPage({
                   Processing Payment...
                 </>
               ) : (
-                `Pay Securely with Razorpay (₹${finalTotal})`
+                `Pay Securely with PhonePe (₹${finalTotal})`
               )}
             </button>
             
