@@ -184,7 +184,9 @@ function getCorsHeaders(request, env) {
     "http://localhost:5175",
     "http://localhost:5176",
     "https://riza-fashions-c2d77.web.app",
-    "https://rizaecom-62115.web.app"
+    "https://rizaecom-62115.web.app",
+    "https://rizafashions.in",
+    "https://www.rizafashions.in"
   ];
 
   if (env.FRONTEND_URL) {
