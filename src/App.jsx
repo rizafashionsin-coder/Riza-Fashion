@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, collection, getDocs, onSnapshot, query, where, updateDoc, increment } from 'firebase/firestore';
 import { subscribeToAuthState } from './services/firebaseServices';
 import { HelpCircle, Star, Phone, MessageSquare, ShieldCheck, Truck, RefreshCw, User } from 'lucide-react';
 
@@ -822,6 +822,85 @@ The orders for the user are shipped through registered domestic courier companie
       console.error("Failed to save orders:", err);
     }
   }, [ordersList]);
+
+  // Check for PhonePe callback/redirect parameters on mount/route change
+  useEffect(() => {
+    const handlePhonePeRedirect = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const gateway = searchParams.get('gateway');
+      const transactionId = searchParams.get('transactionId');
+
+      if (gateway === 'phonepe' && transactionId) {
+        console.log("PhonePe redirect detected. Transaction ID:", transactionId);
+        setIsLoading(true);
+        
+        try {
+          const workerUrl = import.meta.env.VITE_PHONEPE_WORKER_URL || 'https://riza-payment-worker.rizafashions-in.workers.dev';
+          const res = await fetch(`${workerUrl}/api/status/${transactionId}`);
+          const data = await res.json();
+          
+          console.log("PhonePe verification status response:", data);
+          
+          if (data && data.success && data.code === 'PAYMENT_SUCCESS') {
+            // Payment succeeded!
+            // Update order status in firestore
+            const orderRef = doc(db, 'orders', transactionId);
+            await updateDoc(orderRef, {
+              paymentStatus: 'Paid',
+              orderStatus: 'Confirmed'
+            });
+            
+            // Increment coupon usedCount if any coupon was applied
+            const orderDoc = await getDoc(orderRef);
+            if (orderDoc.exists()) {
+              const orderData = orderDoc.data();
+              if (orderData.couponCode) {
+                try {
+                  const couponRef = doc(db, 'coupons', orderData.couponCode);
+                  await updateDoc(couponRef, {
+                    usedCount: increment(1)
+                  });
+                  console.log("Successfully incremented usedCount for coupon:", orderData.couponCode);
+                } catch (couponErr) {
+                  console.error("Failed to increment coupon usedCount:", couponErr);
+                }
+              }
+            }
+
+            // Clear the cart
+            setCart([]);
+            localStorage.removeItem('riza_cart');
+            try {
+              localStorage.removeItem('buyNowItem');
+            } catch (err) {
+              console.error(err);
+            }
+            
+            alert(`Payment of ₹${data.data.amount / 100} was successful! Your order has been placed.`);
+          } else {
+            // Payment failed
+            const orderRef = doc(db, 'orders', transactionId);
+            await updateDoc(orderRef, {
+              paymentStatus: 'Failed',
+              orderStatus: 'Cancelled'
+            });
+            
+            alert(`Payment verification failed: ${data.message || 'Transaction was not successful'}.`);
+          }
+        } catch (error) {
+          console.error("Error verifying PhonePe payment:", error);
+          alert("Error verifying your payment status. Please contact support if amount was deducted.");
+        } finally {
+          setIsLoading(false);
+          // Clean the query parameters from URL
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      }
+    };
+
+    handlePhonePeRedirect();
+  }, []);
 
   // UI Modal Overlays States
   const [isCartOpen, setIsCartOpen] = useState(false);

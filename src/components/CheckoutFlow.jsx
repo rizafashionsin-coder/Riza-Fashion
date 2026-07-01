@@ -40,6 +40,7 @@ export default function CheckoutFlow({
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('phonepe');
 
   const [generatedOrderId, setGeneratedOrderId] = useState('');
   const [isCopied, setIsCopied] = useState(false);
@@ -264,78 +265,47 @@ export default function CheckoutFlow({
       status: 'Ordered'
     };
 
-    console.log("VITE_RAZORPAY_KEY_ID:", import.meta.env.VITE_RAZORPAY_KEY_ID);
-    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-    if (!razorpayKey) {
-      alert("Payment gateway configuration is missing (Razorpay Key is not configured). Please contact support.");
-      return;
-    }
     setIsProcessing(true);
 
-    const options = {
-      key: razorpayKey,
-      amount: finalTotal * 100, // Amount in paise — includes shipping, minus coupon
-      currency: "INR",
-      name: "Riza Fashions",
-      description: `Payment for Order #${orderId}`,
-      image: "https://riza-fashions-c2d77.web.app/favicon-icon.png",
-      handler: async function (response) {
-        // Increment coupon usedCount in Firestore if coupon was applied
-        if (appliedCoupon) {
-          try {
-            const couponRef = doc(db, 'coupons', appliedCoupon.code);
-            await updateDoc(couponRef, {
-              usedCount: increment(1)
-            });
-            console.log("Successfully incremented usedCount for coupon:", appliedCoupon.code);
-          } catch (couponErr) {
-            console.error("Failed to increment coupon usedCount:", couponErr);
-          }
-        }
-
-        const finalDetails = {
-          ...baseOrderDetails,
-          paymentMethod: 'razorpay',
-          paymentStatus: 'Paid',
-          orderStatus: 'Pending',
-          razorpayPaymentId: response.razorpay_payment_id
-        };
-
-        onPlaceOrder(orderId, finalDetails);
-        try {
-          localStorage.setItem('lastPlacedOrderId', orderId);
-        } catch (err) {
-          console.error(err);
-        }
-        onClearCart();
-        setIsProcessing(false);
-        onClose();
-        onNavigate('orders');
-      },
-      prefill: {
-        name: shippingForm.fullName,
-        email: shippingForm.email,
-        contact: shippingForm.phone
-      },
-      theme: {
-        color: "#9C27B0"
-      },
-      modal: {
-        ondismiss: function() {
-          setIsProcessing(false);
-          alert("Payment cancelled.");
-        }
-      }
-    };
-
     try {
-      console.log('Razorpay options being sent:', options);
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (err) {
+      const finalDetails = {
+        ...baseOrderDetails,
+        paymentMethod: 'phonepe',
+        paymentStatus: 'Pending',
+        orderStatus: 'Pending'
+      };
+      
+      await onPlaceOrder(orderId, finalDetails);
+
+      const workerUrl = import.meta.env.VITE_PHONEPE_WORKER_URL || 'https://riza-payment-worker.rizafashions-in.workers.dev';
+      const redirectUrl = `${window.location.origin}/orders?gateway=phonepe&transactionId=${orderId}`;
+
+      const res = await fetch(`${workerUrl}/api/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          transactionId: orderId,
+          userId: auth.currentUser.uid,
+          amount: finalTotal,
+          phone: shippingForm.phone,
+          redirectUrl: redirectUrl
+        })
+      });
+
+      const data = await res.json();
+      if (data && data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        console.error("PhonePe payment initiation failed:", data);
+        alert(`PhonePe Payment failed: ${data.message || 'Verification error'}`);
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error("PhonePe initiation call error:", error);
+      alert("Failed to connect to PhonePe gateway. Please try again.");
       setIsProcessing(false);
-      console.error("Failed to load Razorpay popup:", err);
-      alert("Could not load Razorpay. Please verify your internet connection.");
     }
   };
 
@@ -615,17 +585,61 @@ export default function CheckoutFlow({
                 {/* Form Col */}
                 <div className="payment-fields-wrapper">
                   <h4 className="checkout-subtitle">Payment Mode</h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
-                    Payments are handled securely via Razorpay. Choose to pay using cards, UPI, or net banking.
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                    Secure payment processed via PhonePe:
                   </p>
 
-                  {/* Razorpay Platform Assurance */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F9F0FA', border: '1px solid #E1BEE7', color: '#6A1B9A', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px' }}>
-                    <ShieldCheck size={20} style={{ flexShrink: 0, color: 'var(--primary)' }} />
+                  <div className="payment-methods-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '20px' }}>
+                    {/* PhonePe Option (Static) */}
+                    <div 
+                      style={{
+                        border: '2px solid #5f259f',
+                        background: '#f5f0fa',
+                        borderRadius: '10px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #5f259f',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#5f259f' }} />
+                      </div>
+                      <div>
+                        <strong style={{ display: 'block', color: '#333', fontSize: '0.85rem' }}>PhonePe</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#666' }}>UPI, Cards, NetBanking</span>
+                      </div>
+                      <span style={{
+                        position: 'absolute',
+                        top: '-9px',
+                        right: '8px',
+                        background: '#5f259f',
+                        color: '#fff',
+                        fontSize: '0.65rem',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        fontWeight: 'bold'
+                      }}>Secure</span>
+                    </div>
+                  </div>
+
+                  {/* Platform Assurance */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F5ECFA', border: '1px solid #E2D0F0', color: '#5f259f', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px' }}>
+                    <ShieldCheck size={20} style={{ flexShrink: 0, color: '#5f259f' }} />
                     <div style={{ textAlign: 'left' }}>
-                      <strong>Razorpay Secure Checkout</strong>
-                      <p style={{ margin: '4px 0 0 0', color: '#7B1FA2', fontSize: '0.8rem' }}>
-                        Guarantees safe payment processing. Card details are never collected or stored on our servers.
+                      <strong style={{ color: '#3c007a' }}>PhonePe Secure Checkout</strong>
+                      <p style={{ margin: '4px 0 0 0', color: '#5f259f', fontSize: '0.8rem' }}>
+                        Guarantees safe payment processing. Card and bank details are never stored on our servers.
                       </p>
                     </div>
                   </div>
@@ -654,7 +668,7 @@ export default function CheckoutFlow({
                           Processing Payment...
                         </>
                       ) : (
-                        `Pay Securely with Razorpay (₹${finalTotal})`
+                        `Pay Securely with PhonePe (₹${finalTotal})`
                       )}
                     </button>
                   </div>
