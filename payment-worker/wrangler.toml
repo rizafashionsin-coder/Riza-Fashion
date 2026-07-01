@@ -5,6 +5,6 @@ compatibility_flags = [ "nodejs_compat" ]
 
 [vars]
 PHONEPE_MERCHANT_ID = "M22K7V5N55588_2607011549"
-PHONEPE_ENV = "production"
+PHONEPE_ENV = "sandbox"
 # FRONTEND_URL is used to validate client origins for CORS
-FRONTEND_URL = "https://riza-fashions-c2d77.web.app"
+FRONTEND_URL = "https://rizafashions.in"
