@@ -21,7 +21,8 @@ import {
   Layers,
   Settings,
   User,
-  Tag
+  Tag,
+  Sliders
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { 
@@ -40,7 +41,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-export default function AdminDashboard({ currentUser, onNavigate, categories, deliverySettings }) {
+export default function AdminDashboard({ currentUser, onNavigate, categories, deliverySettings, heroSlides }) {
   // Access control check
   const isAdmin = currentUser && currentUser.isAdmin;
 
@@ -49,6 +50,106 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
 
   // Sidebar toggle state for mobile view
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Hero slides management states
+  const [slidesState, setSlidesState] = useState([
+    { tagline: '', title: '', description: '', buttonText: '', link: '', image: '', accentColor: '#B06BB3' },
+    { tagline: '', title: '', description: '', buttonText: '', link: '', image: '', accentColor: '#8E4F90' },
+    { tagline: '', title: '', description: '', buttonText: '', link: '', image: '', accentColor: '#C58A96' }
+  ]);
+  const [savingHeroSlides, setSavingHeroSlides] = useState(false);
+  const [heroSlidesSuccess, setHeroSlidesSuccess] = useState('');
+  const [heroSlidesError, setHeroSlidesError] = useState('');
+  const [uploadingSlideIdx, setUploadingSlideIdx] = useState(null);
+
+  // Sync with prop heroSlides on change
+  useEffect(() => {
+    if (heroSlides && heroSlides.length > 0) {
+      const mapped = heroSlides.map(slide => ({
+        tagline: slide.tagline || '',
+        title: slide.title || '',
+        description: slide.description || '',
+        buttonText: slide.buttonText || '',
+        link: slide.link || '',
+        image: slide.image || '',
+        accentColor: slide.accentColor || '#B06BB3'
+      }));
+      while (mapped.length < 3) {
+        mapped.push({ tagline: '', title: '', description: '', buttonText: '', link: '', image: '', accentColor: '#B06BB3' });
+      }
+      setSlidesState(mapped.slice(0, 3));
+    }
+  }, [heroSlides]);
+
+  const generateSlideColorsAndGradient = (accentHex) => {
+    if (!accentHex || !accentHex.startsWith('#')) {
+      return {
+        accentColor: '#B06BB3',
+        glowColor: 'rgba(176, 107, 179, 0.4)',
+        gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)'
+      };
+    }
+    const hex = accentHex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    const glowColor = `rgba(${r}, ${g}, ${b}, 0.4)`;
+    const lr1 = Math.round(r + (255 - r) * 0.92);
+    const lg1 = Math.round(g + (255 - g) * 0.92);
+    const lb1 = Math.round(b + (255 - b) * 0.92);
+    const lr2 = Math.round(r + (255 - r) * 0.82);
+    const lg2 = Math.round(g + (255 - g) * 0.82);
+    const lb2 = Math.round(b + (255 - b) * 0.82);
+    return {
+      accentColor: accentHex,
+      glowColor,
+      gradient: `linear-gradient(135deg, rgb(${lr1}, ${lg1}, ${lb1}) 0%, rgb(${lr2}, ${lg2}, ${lb2}) 100%)`
+    };
+  };
+
+  const handleSlideImageUpload = async (e, idx) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingSlideIdx(idx);
+    setHeroSlidesError('');
+    setHeroSlidesSuccess('');
+    try {
+      const downloadURL = await uploadToCloudinary(file);
+      const updated = [...slidesState];
+      updated[idx].image = downloadURL;
+      setSlidesState(updated);
+    } catch (err) {
+      console.error("Cloudinary slide upload failed:", err);
+      setHeroSlidesError(`Slide ${idx + 1} image upload failed: ` + err.message);
+    } finally {
+      setUploadingSlideIdx(null);
+    }
+  };
+
+  const handleSaveHeroSlides = async (e) => {
+    e.preventDefault();
+    setSavingHeroSlides(true);
+    setHeroSlidesSuccess('');
+    setHeroSlidesError('');
+    try {
+      const finalSlides = slidesState.map((slide, idx) => {
+        const generated = generateSlideColorsAndGradient(slide.accentColor);
+        return {
+          id: `slide-${idx + 1}`,
+          ...slide,
+          ...generated
+        };
+      });
+      const heroDocRef = doc(db, 'settings', 'hero');
+      await setDoc(heroDocRef, { slides: finalSlides }, { merge: true });
+      setHeroSlidesSuccess('Hero slideshow settings updated successfully!');
+    } catch (err) {
+      console.error("Failed to save hero slideshow settings:", err);
+      setHeroSlidesError('Failed to save settings: ' + err.message);
+    } finally {
+      setSavingHeroSlides(false);
+    }
+  };
 
   // Firestore collections states
   const [products, setProducts] = useState([]);
@@ -1257,6 +1358,16 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
               <span>Website Settings</span>
             </span>
           </button>
+
+          <button 
+            onClick={() => { setActiveTab('heroSlides'); setIsMobileSidebarOpen(false); }}
+            className={`sidebar-link ${activeTab === 'heroSlides' ? 'active' : ''}`}
+          >
+            <span className="sidebar-link-content">
+              <Sliders size={18} />
+              <span>Hero Slides</span>
+            </span>
+          </button>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -2175,6 +2286,231 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                 </form>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Tab: Hero Slides Sub-Pane */}
+        {activeTab === 'heroSlides' && (
+          <div className="admin-hero-slides-pane animate-fade">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Playfair Display, serif', color: 'var(--charcoal)', margin: 0 }}>Configure Homepage Hero Slides</h2>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Manage the 3 slides displayed on the homepage slider, including images, titles, descriptions, and button links.</p>
+              </div>
+            </div>
+
+            {heroSlidesSuccess && (
+              <div style={{ background: '#F4FAF6', border: '1px solid #C8E6C9', color: '#2E7D32', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px', fontWeight: 500 }}>
+                {heroSlidesSuccess}
+              </div>
+            )}
+
+            {heroSlidesError && (
+              <div style={{ background: '#FFF8F8', border: '1px solid #FFCDD2', color: '#B71C1C', padding: '16px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '24px', fontWeight: 500 }}>
+                {heroSlidesError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveHeroSlides}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', marginBottom: '32px' }}>
+                {slidesState.map((slide, idx) => (
+                  <div key={idx} style={{ background: '#FFF', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h3 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '20px', color: 'var(--primary-dark)', borderBottom: '1px solid var(--border-light)', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Sliders size={18} />
+                      Slide {idx + 1} Configuration
+                    </h3>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                      
+                      {/* Left Sub-Column: Text Inputs */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="form-field">
+                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Tagline / Subtitle</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="e.g. NEW COLLECTION" 
+                            value={slide.tagline}
+                            onChange={(e) => {
+                              const updated = [...slidesState];
+                              updated[idx].tagline = e.target.value;
+                              setSlidesState(updated);
+                            }}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-field">
+                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Main Title</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="e.g. Wholesale Orders Open" 
+                            value={slide.title}
+                            onChange={(e) => {
+                              const updated = [...slidesState];
+                              updated[idx].title = e.target.value;
+                              setSlidesState(updated);
+                            }}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-field">
+                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Description Text</label>
+                          <textarea 
+                            className="admin-textarea" 
+                            rows="3" 
+                            placeholder="e.g. Minimum order ₹2000 - Best prices guaranteed" 
+                            value={slide.description}
+                            onChange={(e) => {
+                              const updated = [...slidesState];
+                              updated[idx].description = e.target.value;
+                              setSlidesState(updated);
+                            }}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right Sub-Column: Buttons and Styling */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div className="form-field">
+                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Button Text</label>
+                            <input 
+                              type="text" 
+                              className="form-input" 
+                              placeholder="e.g. Shop Now" 
+                              value={slide.buttonText}
+                              onChange={(e) => {
+                                const updated = [...slidesState];
+                                updated[idx].buttonText = e.target.value;
+                                setSlidesState(updated);
+                              }}
+                              required
+                            />
+                          </div>
+
+                          <div className="form-field">
+                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Action Link / Route</label>
+                            <input 
+                              type="text" 
+                              className="form-input" 
+                              placeholder="e.g. /shop, /category/accessories" 
+                              value={slide.link}
+                              onChange={(e) => {
+                                const updated = [...slidesState];
+                                updated[idx].link = e.target.value;
+                                setSlidesState(updated);
+                              }}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Accent Theme Color (Hex)</label>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <input 
+                              type="color" 
+                              style={{ width: '40px', height: '40px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: 0 }}
+                              value={slide.accentColor}
+                              onChange={(e) => {
+                                const updated = [...slidesState];
+                                updated[idx].accentColor = e.target.value;
+                                setSlidesState(updated);
+                              }}
+                            />
+                            <input 
+                              type="text" 
+                              className="form-input" 
+                              placeholder="#B06BB3" 
+                              value={slide.accentColor}
+                              onChange={(e) => {
+                                const updated = [...slidesState];
+                                updated[idx].accentColor = e.target.value;
+                                setSlidesState(updated);
+                              }}
+                              style={{ flex: 1 }}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 600 }}>Slide Image</label>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            {slide.image && (
+                              <img 
+                                src={slide.image} 
+                                alt="Slide Preview" 
+                                style={{ width: '56px', height: '70px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-light)' }} 
+                              />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Paste image URL..." 
+                                value={slide.image}
+                                onChange={(e) => {
+                                  const updated = [...slidesState];
+                                  updated[idx].image = e.target.value;
+                                  setSlidesState(updated);
+                                }}
+                                style={{ marginBottom: '8px' }}
+                                required
+                              />
+                              <div style={{ position: 'relative' }}>
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  onChange={(e) => handleSlideImageUpload(e, idx)}
+                                  style={{ display: 'none' }}
+                                  id={`slide-upload-${idx}`}
+                                />
+                                <label 
+                                  htmlFor={`slide-upload-${idx}`}
+                                  className="btn btn-secondary"
+                                  style={{ 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px', 
+                                    padding: '6px 12px', 
+                                    fontSize: '0.8rem', 
+                                    cursor: 'pointer',
+                                    border: '1px solid var(--border-medium)',
+                                    background: '#FFF'
+                                  }}
+                                >
+                                  {uploadingSlideIdx === idx ? <RefreshCw className="animate-spin" size={14} /> : <Upload size={14} />}
+                                  {uploadingSlideIdx === idx ? 'Uploading...' : 'Upload Image'}
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={savingHeroSlides || uploadingSlideIdx !== null}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
+                >
+                  {savingHeroSlides ? <RefreshCw className="animate-spin" size={16} /> : <Check size={16} />}
+                  {savingHeroSlides ? 'Saving Slides...' : 'Save Slides Settings'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </main>

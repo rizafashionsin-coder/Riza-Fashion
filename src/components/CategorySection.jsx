@@ -15,34 +15,23 @@ export default function CategorySection({ onNavigate, categories }) {
           </p>
         </div>
 
-        <div className="categories-grid">
+        <div className="categories-round-list">
           {displayCategories.map((category, idx) => (
-            <div 
+            <button 
               key={category.id || idx} 
-              className="category-card"
+              className="category-round-item"
               onClick={() => onNavigate('shop', category.id)}
             >
-              <div className="category-image-wrapper">
+              <div className="category-round-image-wrapper">
                 <img 
+                  className="category-round-img"
                   src={category.image} 
                   alt={category.name} 
                   loading="lazy"
                 />
-                <div className="category-overlay"></div>
-                {category.offer && (
-                  <span className="category-badge">{category.offer}</span>
-                )}
               </div>
-              
-              <div className="category-content">
-                <h3 className="category-title">{category.name}</h3>
-                <p className="category-desc">{category.description}</p>
-                <span className="category-btn">
-                  Explore
-                  <ArrowRight size={14} />
-                </span>
-              </div>
-            </div>
+              <span className="category-round-name">{category.name}</span>
+            </button>
           ))}
         </div>
       </div>

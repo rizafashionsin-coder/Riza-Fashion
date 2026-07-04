@@ -113,11 +113,12 @@ function HomeView({
   handleWishlistToggle,
   handleCardAddToCart,
   handleNavigate,
-  categories
+  categories,
+  heroSlides
 }) {
   return (
     <div className="page-home animate-fade">
-      <Hero onNavigate={handleNavigate} categories={categories} />
+      <Hero onNavigate={handleNavigate} categories={categories} heroSlides={heroSlides} />
       <CategorySection onNavigate={handleNavigate} categories={categories} />
       <PromoBanner onNavigate={handleNavigate} />
       
@@ -529,6 +530,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [deliverySettings, setDeliverySettings] = useState(null);
+  const [heroSlides, setHeroSlides] = useState([]);
   const [websiteSettings, setWebsiteSettings] = useState({
     contact: {
       businessName: "Riza Fashions",
@@ -726,6 +728,66 @@ The orders for the user are shipped through registered domestic courier companie
       }
     }, (err) => {
       console.error("Error listening to delivery settings:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch hero slides from Firestore with real-time sync
+  useEffect(() => {
+    const heroDocRef = doc(db, 'settings', 'hero');
+    const unsubscribe = onSnapshot(heroDocRef, (docSnap) => {
+      const defaultHeroSlides = [
+        {
+          id: 'slide-1',
+          tagline: 'NEW COLLECTION',
+          title: 'Wholesale Orders Open',
+          description: 'Minimum order ₹2000 - Best prices guaranteed',
+          image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1000&q=80',
+          buttonText: 'Order Now',
+          link: '/shop',
+          accentColor: '#B06BB3',
+          gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)',
+          glowColor: 'rgba(176, 107, 179, 0.4)'
+        },
+        {
+          id: 'slide-2',
+          tagline: 'ELEGANT SATIN',
+          title: 'Premium Satin Loungewear',
+          description: 'Slip into unrivaled comfort and chic styles for your peaceful nights.',
+          image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80',
+          buttonText: 'Shop Loungewear',
+          link: '/category/nightwears',
+          accentColor: '#8E4F90',
+          gradient: 'linear-gradient(135deg, #F6EFF9 0%, #D7BDE2 100%)',
+          glowColor: 'rgba(142, 79, 144, 0.4)'
+        },
+        {
+          id: 'slide-3',
+          tagline: 'DESIGNER SAREES',
+          title: 'Exquisite Heritage Sarees',
+          description: 'Handpicked premium organza, georgette, and silk sarees for every occasion.',
+          image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=80',
+          buttonText: 'Explore Collection',
+          link: '/category/sarees',
+          accentColor: '#C58A96',
+          gradient: 'linear-gradient(135deg, #FAF2F3 0%, #E8C1C7 100%)',
+          glowColor: 'rgba(197, 138, 150, 0.4)'
+        }
+      ];
+
+      if (!docSnap.exists()) {
+        console.log("Firestore hero settings missing. Using in-memory defaults.");
+        setHeroSlides(defaultHeroSlides);
+      } else {
+        const data = docSnap.data();
+        if (data.slides && data.slides.length > 0) {
+          setHeroSlides(data.slides);
+        } else {
+          setHeroSlides(defaultHeroSlides);
+        }
+      }
+    }, (err) => {
+      console.error("Error listening to hero settings:", err);
     });
     return () => unsubscribe();
   }, []);
@@ -1296,6 +1358,7 @@ The orders for the user are shipped through registered domestic courier companie
               handleCardAddToCart={handleCardAddToCart}
               handleNavigate={handleNavigate}
               categories={categories}
+              heroSlides={heroSlides}
             />
           } />
           
@@ -1443,7 +1506,7 @@ The orders for the user are shipped through registered domestic courier companie
             !isLoading && (!currentUser || !currentUser.isAdmin) ? (
               <Navigate to="/" replace />
             ) : (
-              <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} categories={categories} deliverySettings={deliverySettings} />
+              <AdminDashboard currentUser={currentUser} onNavigate={handleNavigate} categories={categories} deliverySettings={deliverySettings} heroSlides={heroSlides} />
             )
           } />
 

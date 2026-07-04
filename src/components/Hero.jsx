@@ -49,43 +49,52 @@ const presetStyles = {
   }
 };
 
-export default function Hero({ onNavigate, categories }) {
-  const displayCategories = categories ? categories.filter(cat => cat.active !== false) : [];
-
-  const slides = displayCategories.map(cat => {
-    const stylePreset = presetStyles[cat.id] || {
-      gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)',
+export default function Hero({ onNavigate, categories, heroSlides }) {
+  const slides = heroSlides && heroSlides.length > 0 ? heroSlides : [
+    {
+      id: 'slide-1',
+      tagline: 'NEW COLLECTION',
+      title: 'Wholesale Orders Open',
+      description: 'Minimum order ₹2000 - Best prices guaranteed',
+      image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1000&q=80',
+      buttonText: 'Order Now',
+      link: '/shop',
       accentColor: '#B06BB3',
-      glowColor: 'rgba(176, 107, 179, 0.3)',
-      tagline: cat.description || 'Premium Custom Collection'
-    };
-    return {
-      id: cat.id,
-      name: cat.name,
-      tagline: stylePreset.tagline,
-      image: cat.image,
-      gradient: stylePreset.gradient,
-      accentColor: stylePreset.accentColor,
-      glowColor: stylePreset.glowColor,
-      textTag: cat.name
-    };
-  });
+      gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)',
+      glowColor: 'rgba(176, 107, 179, 0.4)'
+    },
+    {
+      id: 'slide-2',
+      tagline: 'ELEGANT SATIN',
+      title: 'Premium Satin Loungewear',
+      description: 'Slip into unrivaled comfort and chic styles for your peaceful nights.',
+      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80',
+      buttonText: 'Shop Loungewear',
+      link: '/category/nightwears',
+      accentColor: '#8E4F90',
+      gradient: 'linear-gradient(135deg, #F6EFF9 0%, #D7BDE2 100%)',
+      glowColor: 'rgba(142, 79, 144, 0.4)'
+    },
+    {
+      id: 'slide-3',
+      tagline: 'DESIGNER SAREES',
+      title: 'Exquisite Heritage Sarees',
+      description: 'Handpicked premium organza, georgette, and silk sarees for every occasion.',
+      image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=80',
+      buttonText: 'Explore Collection',
+      link: '/category/sarees',
+      accentColor: '#C58A96',
+      gradient: 'linear-gradient(135deg, #FAF2F3 0%, #E8C1C7 100%)',
+      glowColor: 'rgba(197, 138, 150, 0.4)'
+    }
+  ];
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
   
   const activeIndexBounded = activeIndex < slides.length ? activeIndex : 0;
-  const activeSlide = slides[activeIndexBounded] || {
-    id: 'default',
-    name: 'Collection',
-    tagline: 'Premium Women\'s Wear Collection',
-    image: '',
-    gradient: 'linear-gradient(135deg, #FDFCF9 0%, #F5EFEB 100%)',
-    accentColor: '#B06BB3',
-    glowColor: 'rgba(176, 107, 179, 0.3)',
-    textTag: 'Collection'
-  };
+  const activeSlide = slides[activeIndexBounded] || slides[0];
   
   const timerRef = useRef(null);
 
@@ -104,7 +113,6 @@ export default function Hero({ onNavigate, categories }) {
   // Handle manual category switches
   const handleCategorySwitch = (idx) => {
     setActiveIndex(idx);
-    // Force reset timer by temporarily toggling hover state
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
@@ -119,6 +127,31 @@ export default function Hero({ onNavigate, categories }) {
   const handleMouseLeave = () => {
     setIsHovered(false);
     setMouseOffset({ x: 0, y: 0 });
+  };
+
+  // Helper function to resolve dynamic CTA action link from admin slide dashboard
+  const handleNavigateUrl = (link) => {
+    if (!link) {
+      onNavigate('shop');
+      return;
+    }
+    const lowerLink = link.toLowerCase().trim();
+    if (lowerLink.includes('/category/')) {
+      const parts = link.split('/');
+      const category = parts[parts.length - 1];
+      onNavigate('shop', category);
+    } else if (lowerLink.includes('/product/')) {
+      const parts = link.split('/');
+      const productId = parts[parts.length - 1];
+      onNavigate('shop', null, false, false, productId);
+    } else if (lowerLink.includes('shop')) {
+      onNavigate('shop');
+    } else if (lowerLink.includes('home') || lowerLink === '/') {
+      onNavigate('home');
+    } else {
+      const cleanLink = link.startsWith('/') ? link.substring(1) : link;
+      onNavigate(cleanLink);
+    }
   };
 
   // Particles generator mock array
@@ -160,37 +193,26 @@ export default function Hero({ onNavigate, categories }) {
         
         {/* Left Side: Editorial Typography Content */}
         <div className="hero-editorial-content">
-          <div className="hero-editorial-tag animate-fade">
+          <div className="hero-editorial-tag animate-fade" key={activeSlide.id + '-tag'}>
             <Sparkles size={14} style={{ color: activeSlide.accentColor }} />
-            <span>Premium Women's Wear Collection</span>
+            <span>{activeSlide.tagline || "NEW COLLECTION"}</span>
           </div>
 
-          <h1 className="hero-editorial-title">
-            Elegance Crafted <br />
-            <span style={{ 
-              color: activeSlide.accentColor,
-              textShadow: `0 0 20px ${activeSlide.glowColor}`
-            }}>
-              For Every Woman
-            </span>
+          <h1 className="hero-editorial-title" key={activeSlide.id + '-title'} style={{ fontFamily: 'Playfair Display, serif', fontWeight: 700 }}>
+            {activeSlide.title}
           </h1>
 
-          <h2 className="hero-editorial-tagline animate-slide-up" key={activeSlide.id}>
-            {activeSlide.tagline}
-          </h2>
-
-          <p className="hero-editorial-desc">
-            Discover premium fashion collections designed to celebrate your unique style. 
-            Tailored with the finest fabrics, elegant drapes, and modern cuts.
+          <p className="hero-editorial-desc" key={activeSlide.id + '-desc'}>
+            {activeSlide.description}
           </p>
 
           <div className="hero-editorial-actions">
             <button 
               className="btn btn-primary btn-luxury-shop"
-              style={{ backgroundColor: activeSlide.accentColor, borderColor: activeSlide.accentColor }}
-              onClick={() => onNavigate('shop', activeSlide.id)}
+              style={{ backgroundColor: activeSlide.accentColor, borderColor: activeSlide.accentColor, display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => handleNavigateUrl(activeSlide.link)}
             >
-              Shop Now
+              {activeSlide.buttonText || 'Shop Now'}
               <ArrowRight size={18} />
             </button>
             <button 
@@ -210,7 +232,7 @@ export default function Hero({ onNavigate, categories }) {
             className="model-showcase-frame-wrapper"
             style={{ 
               transform: `translate(${mouseOffset.x}px, ${mouseOffset.y}px)`,
-              boxShadow: `0 20px 50px ${activeSlide.glowColor}`
+              boxShadow: `0 20px 50px ${activeSlide.glowColor || 'rgba(0,0,0,0.15)'}`
             }}
           >
             <div className="showcase-glow-backdrop" style={{ backgroundColor: activeSlide.accentColor }}></div>
@@ -218,60 +240,32 @@ export default function Hero({ onNavigate, categories }) {
             {/* Overlapping cross-fade images */}
             {slides.map((slide, idx) => (
               <img
-                key={slide.id}
+                key={slide.id || idx}
                 src={slide.image}
-                alt={slide.name}
+                alt={slide.title || 'Slide Image'}
                 className={`showcase-model-img ${activeIndexBounded === idx ? 'visible' : ''}`}
                 loading="eager"
               />
             ))}
           </div>
 
-          {/* Desktop Circular Floating Category Nodes */}
-          {slides.slice(0, 6).map((slide, idx) => {
-            const isActive = activeIndexBounded === idx;
-            return (
-              <button
-                key={slide.id}
-                className={`category-float-node ${isActive ? 'active' : ''}`}
-                style={{
-                  ...bubbleCoordinates[idx],
-                  transform: `translate(${mouseOffset.x * 1.5}px, ${mouseOffset.y * 1.5}px)`,
-                  '--glow-color': slide.glowColor,
-                  '--accent-color': slide.accentColor,
-                  backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55)), url(${slide.image})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-                onMouseEnter={() => handleCategorySwitch(idx)}
-                onClick={() => onNavigate('shop', slide.id)}
-              >
-                <span className="node-text" style={{ color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{slide.textTag}</span>
-              </button>
-            );
-          })}
-
         </div>
 
       </div>
 
-      {/* Mobile Swipeable Category Pills Bar */}
-      <div className="mobile-category-swiper-bar">
-        <div className="swiper-scroller no-scrollbar">
-          {slides.map((slide, idx) => {
-            const isActive = activeIndexBounded === idx;
-            return (
-              <button
-                key={slide.id}
-                className={`swiper-pill-btn ${isActive ? 'active' : ''}`}
-                style={isActive ? { backgroundColor: slide.accentColor, color: '#fff' } : {}}
-                onClick={() => onNavigate('shop', slide.id)}
-              >
-                {slide.name}
-              </button>
-            );
-          })}
-        </div>
+      {/* Centered Indicator Dots */}
+      <div className="hero-slider-dots">
+        {slides.map((_, idx) => (
+          <button
+            key={idx}
+            className={`hero-dot-btn ${activeIndexBounded === idx ? 'active' : ''}`}
+            style={{
+              backgroundColor: activeIndexBounded === idx ? activeSlide.accentColor : 'rgba(0,0,0,0.25)'
+            }}
+            onClick={() => handleCategorySwitch(idx)}
+            aria-label={`Go to slide ${idx + 1}`}
+          />
+        ))}
       </div>
 
     </section>
