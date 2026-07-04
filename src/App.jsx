@@ -18,7 +18,6 @@ import Navbar from './components/Navbar';
 import MobileNav from './components/MobileNav';
 import Hero from './components/Hero';
 import CategorySection from './components/CategorySection';
-import PromoBanner from './components/PromoBanner';
 import ProductCard from './components/ProductCard';
 import CartDrawer from './components/CartDrawer';
 import CheckoutFlow from './components/CheckoutFlow';
@@ -120,7 +119,6 @@ function HomeView({
     <div className="page-home animate-fade">
       <Hero onNavigate={handleNavigate} categories={categories} heroSlides={heroSlides} />
       <CategorySection onNavigate={handleNavigate} categories={categories} />
-      <PromoBanner onNavigate={handleNavigate} />
       
       {/* Featured Grid Section */}
       <section className="section featured-products-section">

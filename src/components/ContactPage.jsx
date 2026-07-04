@@ -22,6 +22,14 @@ export default function ContactPage({ onNavigate, settings }) {
 
   const handleContactSubmit = (e) => {
     e.preventDefault();
+
+    const formattedMessage = `Hello Riza Fashions,\n\nI would like to make an enquiry:\n\n*Name:* ${name}\n*Email:* ${email}\n*Subject:* ${subject}\n*Message:* ${message}`;
+    const encodedMessage = encodeURIComponent(formattedMessage);
+    const whatsAppNumberClean = contact.whatsAppNumber ? contact.whatsAppNumber.replace(/[^0-9]/g, '') : '919600629335';
+    const whatsappUrl = `https://wa.me/${whatsAppNumberClean}?text=${encodedMessage}`;
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
     setContactSubmitted(true);
     setName('');
     setEmail('');
