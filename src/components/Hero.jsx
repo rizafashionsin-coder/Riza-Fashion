@@ -50,44 +50,11 @@ const presetStyles = {
 };
 
 export default function Hero({ onNavigate, categories, heroSlides }) {
-  const slides = heroSlides && heroSlides.length > 0 ? heroSlides : [
-    {
-      id: 'slide-1',
-      tagline: 'NEW COLLECTION',
-      title: 'Wholesale Orders Open',
-      description: 'Minimum order ₹2000 - Best prices guaranteed',
-      image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1000&q=80',
-      buttonText: 'Order Now',
-      link: '/shop',
-      accentColor: '#B06BB3',
-      gradient: 'linear-gradient(135deg, #F8F4FA 0%, #E9D8EF 100%)',
-      glowColor: 'rgba(176, 107, 179, 0.4)'
-    },
-    {
-      id: 'slide-2',
-      tagline: 'ELEGANT SATIN',
-      title: 'Premium Satin Loungewear',
-      description: 'Slip into unrivaled comfort and chic styles for your peaceful nights.',
-      image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80',
-      buttonText: 'Shop Loungewear',
-      link: '/category/nightwears',
-      accentColor: '#8E4F90',
-      gradient: 'linear-gradient(135deg, #F6EFF9 0%, #D7BDE2 100%)',
-      glowColor: 'rgba(142, 79, 144, 0.4)'
-    },
-    {
-      id: 'slide-3',
-      tagline: 'DESIGNER SAREES',
-      title: 'Exquisite Heritage Sarees',
-      description: 'Handpicked premium organza, georgette, and silk sarees for every occasion.',
-      image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=80',
-      buttonText: 'Explore Collection',
-      link: '/category/sarees',
-      accentColor: '#C58A96',
-      gradient: 'linear-gradient(135deg, #FAF2F3 0%, #E8C1C7 100%)',
-      glowColor: 'rgba(197, 138, 150, 0.4)'
-    }
-  ];
+  const slides = heroSlides || [];
+
+  if (slides.length === 0) {
+    return null;
+  }
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
