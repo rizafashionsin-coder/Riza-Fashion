@@ -5,7 +5,8 @@ import {
   createUserWithEmailAndPassword, 
   signInWithPopup, 
   GoogleAuthProvider, 
-  updateProfile 
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -149,6 +150,9 @@ export default function LoginPage({ currentUser, setCurrentUser }) {
 
         setAuthSuccessMsg('Logged in successfully!');
         handlePostLoginRedirect();
+      } else if (modalMode === 'forgot_password') {
+        await sendPasswordResetEmail(auth, authEmail);
+        setAuthSuccessMsg('Password reset link has been sent to your email address!');
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
         const user = userCredential.user;
@@ -226,12 +230,18 @@ export default function LoginPage({ currentUser, setCurrentUser }) {
         <div className="login-form-column">
           <div className="account-modal-body">
             <h2 className="login-form-title">
-              {modalMode === 'login' ? 'Welcome Back' : 'Create Account'}
+              {modalMode === 'login' 
+                ? 'Welcome Back' 
+                : modalMode === 'signup' 
+                ? 'Create Account' 
+                : 'Reset Password'}
             </h2>
             <p className="login-form-desc">
               {modalMode === 'login' 
                 ? 'Access your private dashboard and closet items.' 
-                : 'Join our premium boutique platform and check out securely.'}
+                : modalMode === 'signup'
+                ? 'Join our premium boutique platform and check out securely.'
+                : 'Enter your email address and we\'ll send you a password recovery link.'}
             </p>
 
             {authError && (
@@ -281,60 +291,98 @@ export default function LoginPage({ currentUser, setCurrentUser }) {
                 </div>
               </div>
 
-              <div className="form-field text-left">
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--charcoal)' }}>Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
-                  <input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="form-input" 
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    required 
-                    style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)' }}
-                  />
+              {modalMode !== 'forgot_password' && (
+                <div className="form-field text-left">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ margin: 0, fontSize: '0.85rem', fontWeight: 500, color: 'var(--charcoal)' }}>Password</label>
+                    {modalMode === 'login' && (
+                      <button 
+                        type="button" 
+                        onClick={() => { setModalMode('forgot_password'); setAuthError(''); setAuthSuccessMsg(''); }}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 500 }}
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
+                    <input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="form-input" 
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required 
+                      style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-medium)' }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <button 
-                type="submit" 
-                className="btn btn-primary btn-block" 
-                disabled={authLoading}
-                style={{ width: '100%', padding: '12px', background: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, marginTop: '8px' }}
-              >
-                {authLoading ? 'Please wait...' : modalMode === 'login' ? 'Log In' : 'Sign Up'}
-              </button>
+              {modalMode === 'forgot_password' ? (
+                <button 
+                  type="submit" 
+                  className="btn btn-primary btn-block" 
+                  disabled={authLoading}
+                  style={{ width: '100%', padding: '12px', background: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, marginTop: '8px' }}
+                >
+                  {authLoading ? 'Sending link...' : 'Send Reset Link'}
+                </button>
+              ) : (
+                <>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary btn-block" 
+                    disabled={authLoading}
+                    style={{ width: '100%', padding: '12px', background: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, marginTop: '8px' }}
+                  >
+                    {authLoading ? 'Please wait...' : modalMode === 'login' ? 'Log In' : 'Sign Up'}
+                  </button>
 
-              <button 
-                type="button" 
-                className="btn btn-google btn-block" 
-                onClick={handleGoogleSignIn}
-                disabled={authLoading}
-                style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#FFF', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', fontWeight: 500 }}
-              >
-                <GoogleIcon /> Continue with Google
-              </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-google btn-block" 
+                    onClick={handleGoogleSignIn}
+                    disabled={authLoading}
+                    style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#FFF', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', fontWeight: 500 }}
+                  >
+                    <GoogleIcon /> Continue with Google
+                  </button>
+                </>
+              )}
             </form>
             
-            <span className="or-divider" style={{ display: 'block', textAlign: 'center', margin: '16px 0', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-light)' }}>or</span>
-            
-            {modalMode === 'login' ? (
-              <button 
-                className="btn btn-secondary btn-block" 
-                onClick={() => { setModalMode('signup'); setAuthError(''); setAuthSuccessMsg(''); }}
-                style={{ width: '100%', padding: '12px', background: '#FAF7FB', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontWeight: 500, color: 'var(--primary)' }}
-              >
-                Create New Account
-              </button>
-            ) : (
+            {modalMode === 'forgot_password' ? (
               <button 
                 className="btn btn-secondary btn-block" 
                 onClick={() => { setModalMode('login'); setAuthError(''); setAuthSuccessMsg(''); }}
                 style={{ width: '100%', padding: '12px', background: '#FAF7FB', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontWeight: 500, color: 'var(--primary)' }}
               >
-                Already have an account? Log In
+                Back to Log In
               </button>
+            ) : modalMode === 'login' ? (
+              <>
+                <span className="or-divider" style={{ display: 'block', textAlign: 'center', margin: '16px 0', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-light)' }}>or</span>
+                <button 
+                  className="btn btn-secondary btn-block" 
+                  onClick={() => { setModalMode('signup'); setAuthError(''); setAuthSuccessMsg(''); }}
+                  style={{ width: '100%', padding: '12px', background: '#FAF7FB', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontWeight: 500, color: 'var(--primary)' }}
+                >
+                  Create New Account
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="or-divider" style={{ display: 'block', textAlign: 'center', margin: '16px 0', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-light)' }}>or</span>
+                <button 
+                  className="btn btn-secondary btn-block" 
+                  onClick={() => { setModalMode('login'); setAuthError(''); setAuthSuccessMsg(''); }}
+                  style={{ width: '100%', padding: '12px', background: '#FAF7FB', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontWeight: 500, color: 'var(--primary)' }}
+                >
+                  Already have an account? Log In
+                </button>
+              </>
             )}
           </div>
         </div>
