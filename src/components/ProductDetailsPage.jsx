@@ -120,7 +120,9 @@ export default function ProductDetailsPage({
     if (product.variants && Array.isArray(product.variants)) {
       const variant = product.variants.find(v => v.colorName === colorName);
       if (variant) {
-        if (variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+        if (variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
+          setSelectedImageIdx(variant.imageIndices[0]);
+        } else if (variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
           setSelectedImageIdx(variant.imageIndex);
         }
         const nextValidSizes = variant.sizes ? Object.keys(variant.sizes) : [];
@@ -159,7 +161,12 @@ export default function ProductDetailsPage({
     
     // Find a variant that matches the selected image index
     if (product.variants && Array.isArray(product.variants)) {
-      const matchingVariant = product.variants.find(v => v.imageIndex === idx);
+      const matchingVariant = product.variants.find(v => {
+        if (v.imageIndices && Array.isArray(v.imageIndices)) {
+          return v.imageIndices.includes(idx);
+        }
+        return v.imageIndex === idx;
+      });
       if (matchingVariant) {
         setSelectedColor(matchingVariant.colorName);
         const nextValidSizes = matchingVariant.sizes ? Object.keys(matchingVariant.sizes) : [];
@@ -353,6 +360,32 @@ export default function ProductDetailsPage({
     setReviewSubmitted(true);
   };
 
+  const displayImages = useMemo(() => {
+    if (!product) return [];
+    if (selectedColor && product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
+        return variant.imageIndices
+          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
+          .filter(item => item.url);
+      }
+      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
+      }
+    }
+    // Fallback: show all images
+    return product.images.map((img, idx) => ({ url: img, originalIdx: idx }));
+  }, [product, selectedColor]);
+
+  useEffect(() => {
+    if (displayImages && displayImages.length > 0) {
+      const isCurrentIdxValid = displayImages.some(imgItem => imgItem.originalIdx === selectedImageIdx);
+      if (!isCurrentIdxValid) {
+        setSelectedImageIdx(displayImages[0].originalIdx);
+      }
+    }
+  }, [displayImages, selectedImageIdx]);
+
   const isWishlisted = wishlist.some(item => item.id === product.id);
   const primaryImage = product.images[selectedImageIdx] || product.images[0];
 
@@ -376,13 +409,13 @@ export default function ProductDetailsPage({
           <div className="product-gallery-container">
             {/* Sidebar Thumbnails */}
             <div className="product-gallery-thumbnails">
-              {product.images.map((img, idx) => (
+              {displayImages.map((imgItem, index) => (
                 <button
-                  key={idx}
-                  className={`gallery-thumb-btn ${selectedImageIdx === idx ? 'active' : ''}`}
-                  onClick={() => handleImageChange(idx)}
+                  key={index}
+                  className={`gallery-thumb-btn ${selectedImageIdx === imgItem.originalIdx ? 'active' : ''}`}
+                  onClick={() => handleImageChange(imgItem.originalIdx)}
                 >
-                  <img src={img} alt={`${product.name} View ${idx + 1}`} />
+                  <img src={imgItem.url} alt={`${product.name} View ${index + 1}`} />
                 </button>
               ))}
             </div>

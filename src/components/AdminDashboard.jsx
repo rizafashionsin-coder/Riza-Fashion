@@ -329,7 +329,20 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
   const categoriesList = categories.map(cat => ({ value: cat.id, label: cat.name }));
 
   // Sizes choices
-  const sizeOptions = ['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+  const [sizeOptions, setSizeOptions] = useState(['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']);
+  const [customSizeInput, setCustomSizeInput] = useState('');
+
+  const handleAddCustomSize = () => {
+    const val = customSizeInput.trim();
+    if (!val) return;
+    // Don't add duplicate size (case insensitive check)
+    if (sizeOptions.map(s => s.toLowerCase()).includes(val.toLowerCase())) {
+      alert(`Size "${val}" already exists.`);
+      return;
+    }
+    setSizeOptions(prev => [...prev, val]);
+    setCustomSizeInput('');
+  };
 
   // Load Website Settings & Policies from Firestore
   useEffect(() => {
@@ -765,6 +778,8 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdVariants([]);
     setColorPickerCode('#D4A5A5');
     setColorInputName('');
+    setSizeOptions(['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']);
+    setCustomSizeInput('');
     setProdDetails('');
     setProdImages([]);
     setProdStock(100);
@@ -787,14 +802,24 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
     setProdFeatured(product.featured !== undefined ? product.featured : (product.isFeatured || false));
     setProdLimited(product.limitedOffer !== undefined ? product.limitedOffer : (product.isLimited || false));
     
+    const currentSizes = new Set(['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']);
     let initialVariants = [];
     if (product.variants && Array.isArray(product.variants)) {
+      product.variants.forEach(v => {
+        if (v.sizes) {
+          Object.keys(v.sizes).forEach(sz => currentSizes.add(sz));
+        }
+      });
       initialVariants = product.variants.map(v => ({
         ...v,
         description: v.description || '',
-        details: v.details ? (Array.isArray(v.details) ? v.details.join('\n') : v.details) : ''
+        details: v.details ? (Array.isArray(v.details) ? v.details.join('\n') : v.details) : '',
+        imageIndices: v.imageIndices || (v.imageIndex !== undefined && v.imageIndex !== -1 ? [v.imageIndex] : [])
       }));
     } else if (product.colors && Array.isArray(product.colors)) {
+      if (product.sizes && Array.isArray(product.sizes)) {
+        product.sizes.forEach(sz => currentSizes.add(sz));
+      }
       // Migrate old colors & sizeStock/sizes to the new variants matrix
       initialVariants = product.colors.map(col => {
         const colName = typeof col === 'string' ? col : col.name;
@@ -812,16 +837,20 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
         const colSizes = (typeof col === 'object' && col.sizes) ? col.sizes : (product.sizes || []);
         colSizes.forEach(sz => {
           sizesObj[sz] = product.sizeStock?.[sz] !== undefined ? product.sizeStock[sz] : 10;
+          currentSizes.add(sz);
         });
         
         return {
           colorName: colName,
           colorCode: colCode,
           imageIndex: imgIdx,
+          imageIndices: imgIdx !== -1 ? [imgIdx] : [],
           sizes: sizesObj
         };
       });
     }
+    setSizeOptions(Array.from(currentSizes));
+    setCustomSizeInput('');
     setProdVariants(initialVariants);
     setColorPickerCode('#D4A5A5');
     setColorInputName('');
@@ -920,6 +949,7 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       colorName: name,
       colorCode: code,
       imageIndex: -1,
+      imageIndices: [],
       sizes: {}
     }]);
     setColorInputName('');
@@ -979,10 +1009,13 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
           variantDetailsArray = v.details.split('\n').map(d => d.trim()).filter(Boolean);
         }
       }
+      const finalIndices = v.imageIndices && Array.isArray(v.imageIndices) ? v.imageIndices : (v.imageIndex !== undefined && v.imageIndex !== -1 ? [v.imageIndex] : []);
+      const finalIndex = finalIndices.length > 0 ? finalIndices[0] : -1;
       return {
         colorName: v.colorName,
         colorCode: v.colorCode,
-        imageIndex: v.imageIndex,
+        imageIndex: finalIndex,
+        imageIndices: finalIndices,
         sizes: v.sizes,
         name: v.name ? v.name.trim() : '',
         description: v.description ? v.description.trim() : '',
@@ -2685,6 +2718,59 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                       </button>
                     </div>
 
+                    {/* Global Size Options Manager */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px', background: '#F8F9FA', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--charcoal)' }}>Size Options:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {sizeOptions.map(sz => (
+                          <span key={sz} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EAE5F0', color: 'var(--primary-dark)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 500 }}>
+                            {sz}
+                            {!['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'].includes(sz) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSizeOptions(prev => prev.filter(x => x !== sz));
+                                  // Also remove it from all configured variants sizes
+                                  setProdVariants(prev => prev.map(v => {
+                                    const newSizes = { ...v.sizes };
+                                    delete newSizes[sz];
+                                    return { ...v, sizes: newSizes };
+                                  }));
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', padding: 0, fontSize: '0.72rem', display: 'flex', alignItems: 'center' }}
+                                title="Remove size option"
+                              >
+                                <X size={10} />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="e.g. 28, 30, Custom-XXL"
+                          value={customSizeInput}
+                          onChange={(e) => setCustomSizeInput(e.target.value)}
+                          style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF', width: '130px' }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomSize();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomSize}
+                          className="btn btn-primary"
+                          style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600 }}
+                        >
+                          Add Size
+                        </button>
+                      </div>
+                    </div>
+
                     <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '10px', background: '#FFF', minHeight: '80px' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-light)', display: 'block', marginBottom: '10px', textTransform: 'uppercase' }}>Configured Color Matrix Preview</span>
                       {prodVariants.length === 0 ? (
@@ -2711,21 +2797,59 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
                               </div>
 
                               {/* Associated Image Dropdown */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)', minWidth: '130px' }}>Linked Image Swap:</span>
-                                <select
-                                  value={col.imageIndex !== undefined ? col.imageIndex : -1}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value);
-                                    setProdVariants(prev => prev.map((c, i) => i === idx ? { ...c, imageIndex: val } : c));
-                                  }}
-                                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid var(--border-medium)', background: '#FFF' }}
-                                >
-                                  <option value={-1}>No Image Swap (Default)</option>
-                                  {prodImages.map((imgUrl, imgIdx) => (
-                                    <option key={imgIdx} value={imgIdx}>Image {imgIdx + 1}</option>
-                                  ))}
-                                </select>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-main)' }}>Linked Image Swap (Select multiple images for this color):</span>
+                                {prodImages.length === 0 ? (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-light)', fontStyle: 'italic' }}>Please upload product images first to link them to colors.</span>
+                                ) : (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {prodImages.map((imgUrl, imgIdx) => {
+                                      const isLinked = col.imageIndices && Array.isArray(col.imageIndices)
+                                        ? col.imageIndices.includes(imgIdx)
+                                        : col.imageIndex === imgIdx;
+                                      return (
+                                        <div
+                                          key={imgIdx}
+                                          onClick={() => {
+                                            setProdVariants(prev => prev.map((c, i) => {
+                                              if (i === idx) {
+                                                let indices = c.imageIndices && Array.isArray(c.imageIndices) ? [...c.imageIndices] : (c.imageIndex !== undefined && c.imageIndex !== -1 ? [c.imageIndex] : []);
+                                                if (indices.includes(imgIdx)) {
+                                                  indices = indices.filter(x => x !== imgIdx);
+                                                } else {
+                                                  indices.push(imgIdx);
+                                                }
+                                                const firstIdx = indices.length > 0 ? indices[0] : -1;
+                                                return { ...c, imageIndices: indices, imageIndex: firstIdx };
+                                              }
+                                              return c;
+                                            }));
+                                          }}
+                                          style={{
+                                            position: 'relative',
+                                            width: '50px',
+                                            height: '50px',
+                                            borderRadius: '6px',
+                                            overflow: 'hidden',
+                                            border: isLinked ? '2px solid var(--primary)' : '1px solid var(--border-medium)',
+                                            cursor: 'pointer',
+                                            opacity: isLinked ? 1 : 0.6,
+                                            boxShadow: isLinked ? '0 0 0 2px rgba(138, 75, 175, 0.2)' : 'none',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          title={`Image ${imgIdx + 1}`}
+                                        >
+                                          <img src={imgUrl} alt={`Uploaded View ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          {isLinked && (
+                                            <div style={{ position: 'absolute', top: '2px', right: '2px', background: 'var(--primary)', color: '#FFF', borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 'bold' }}>
+                                              ✓
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Size configuration list for this color */}

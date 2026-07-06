@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Search, Heart, ShoppingBag, User, Menu, X, Tag } from 'lucide-react';
+import { Search, Heart, ShoppingBag, User, Menu, X, Tag, Zap } from 'lucide-react';
 
 export default function Navbar({
   cartCount,
@@ -52,6 +52,7 @@ export default function Navbar({
     { label: 'Shop', view: 'shop' },
     ...dynamicLinks,
     { label: 'Sale', view: 'shop', isSale: true },
+    { label: '🔥 Offers', view: 'offers', isOffers: true },
     { label: 'Contact', view: 'contact' }
   ];
 
@@ -59,6 +60,8 @@ export default function Navbar({
     setIsMobileMenuOpen(false);
     if (link.isSale) {
       onNavigate(link.view, null, true);
+    } else if (link.isOffers) {
+      onNavigate('offers');
     } else {
       onNavigate(link.view, link.category || null);
     }
@@ -76,6 +79,9 @@ export default function Navbar({
     }
     if (link.view === 'contact') {
       return currentPage === 'contact';
+    }
+    if (link.isOffers) {
+      return currentPage === 'offers';
     }
     if (link.view === 'shop') {
       if (link.isSale) return false;

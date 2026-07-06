@@ -64,6 +64,12 @@ export default function Hero({ onNavigate, categories, heroSlides }) {
   const activeSlide = slides[activeIndexBounded] || slides[0];
   
   const timerRef = useRef(null);
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(null);
+  
+  const minSwipeDistance = 50;
 
   // Autoplay intervals (4.5s) - pauses on mouse hover
   useEffect(() => {
@@ -94,6 +100,58 @@ export default function Hero({ onNavigate, categories, heroSlides }) {
   const handleMouseLeave = () => {
     setIsHovered(false);
     setMouseOffset({ x: 0, y: 0 });
+    isDragging.current = false;
+    dragStartX.current = null;
+  };
+
+  // Touch Swipe handlers
+  const handleTouchStart = (e) => {
+    touchEndX.current = null;
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      setActiveIndex(prev => (prev >= slides.length - 1 ? 0 : prev + 1));
+      if (timerRef.current) clearInterval(timerRef.current);
+    } else if (isRightSwipe) {
+      setActiveIndex(prev => (prev <= 0 ? slides.length - 1 : prev - 1));
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  // Mouse Drag Swipe handlers
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isDragging.current || dragStartX.current === null) return;
+    isDragging.current = false;
+    const distance = dragStartX.current - e.clientX;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      setActiveIndex(prev => (prev >= slides.length - 1 ? 0 : prev + 1));
+      if (timerRef.current) clearInterval(timerRef.current);
+    } else if (isRightSwipe) {
+      setActiveIndex(prev => (prev <= 0 ? slides.length - 1 : prev - 1));
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    dragStartX.current = null;
   };
 
   // Helper function to resolve dynamic CTA action link from admin slide dashboard
@@ -138,6 +196,11 @@ export default function Hero({ onNavigate, categories, heroSlides }) {
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
     >
       {/* Floating Particles in background */}
       {backgroundParticles.map((pt, idx) => (
@@ -212,6 +275,8 @@ export default function Hero({ onNavigate, categories, heroSlides }) {
                 alt={slide.title || 'Slide Image'}
                 className={`showcase-model-img ${activeIndexBounded === idx ? 'visible' : ''}`}
                 loading="eager"
+                draggable="false"
+                style={{ pointerEvents: 'none' }}
               />
             ))}
           </div>

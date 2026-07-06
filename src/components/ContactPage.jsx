@@ -16,14 +16,13 @@ export default function ContactPage({ onNavigate, settings }) {
 
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
   const handleContactSubmit = (e) => {
     e.preventDefault();
 
-    const formattedMessage = `Hello Riza Fashions,\n\nI would like to make an enquiry:\n\n*Name:* ${name}\n*Email:* ${email}\n*Subject:* ${subject}\n*Message:* ${message}`;
+    const formattedMessage = `Hello Riza Fashions,\n\nI would like to make an enquiry:\n\n*Name:* ${name}\n*Subject:* ${subject}\n*Message:* ${message}`;
     const encodedMessage = encodeURIComponent(formattedMessage);
     const whatsAppNumberClean = contact.whatsAppNumber ? contact.whatsAppNumber.replace(/[^0-9]/g, '') : '919600629335';
     const whatsappUrl = `https://wa.me/${whatsAppNumberClean}?text=${encodedMessage}`;
@@ -32,7 +31,6 @@ export default function ContactPage({ onNavigate, settings }) {
 
     setContactSubmitted(true);
     setName('');
-    setEmail('');
     setSubject('');
     setMessage('');
     setTimeout(() => setContactSubmitted(false), 6000);
@@ -68,34 +66,21 @@ export default function ContactPage({ onNavigate, settings }) {
                   </div>
                   <div className="alert-content">
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Message Transmitted Successfully</h3>
-                    <p style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>Thank you! Our personal fashion stylist will contact you at your email address within 2-4 hours.</p>
+                    <p style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>Thank you! Our personal fashion stylist will contact you on WhatsApp within 2-4 hours.</p>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleContactSubmit} className="contact-form">
-                  <div className="checkout-form-row grid-2-col">
-                    <div className="form-field">
-                      <label>Your Name</label>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        placeholder="e.g. Maya Iyer" 
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required 
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label>Email Address</label>
-                      <input 
-                        type="email" 
-                        className="form-input" 
-                        placeholder="e.g. maya@gmail.com" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required 
-                      />
-                    </div>
+                  <div className="form-field">
+                    <label>Your Name</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. Maya Iyer" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required 
+                    />
                   </div>
                   
                   <div className="form-field" style={{ marginTop: '20px' }}>
@@ -123,7 +108,7 @@ export default function ContactPage({ onNavigate, settings }) {
                   </div>
 
                   <button type="submit" className="btn btn-dark btn-block">
-                    Send Enquiry Message
+                    Send Enquiry via WhatsApp
                   </button>
                 </form>
               )}

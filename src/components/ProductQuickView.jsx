@@ -94,7 +94,9 @@ export default function ProductQuickView({
     if (product.variants && Array.isArray(product.variants)) {
       const variant = product.variants.find(v => v.colorName === colorName);
       if (variant) {
-        if (variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+        if (variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
+          setActiveImageIdx(variant.imageIndices[0]);
+        } else if (variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
           setActiveImageIdx(variant.imageIndex);
         }
         const nextValidSizes = variant.sizes ? Object.keys(variant.sizes) : [];
@@ -133,7 +135,12 @@ export default function ProductQuickView({
     
     // Find a variant that matches the selected image index
     if (product.variants && Array.isArray(product.variants)) {
-      const matchingVariant = product.variants.find(v => v.imageIndex === idx);
+      const matchingVariant = product.variants.find(v => {
+        if (v.imageIndices && Array.isArray(v.imageIndices)) {
+          return v.imageIndices.includes(idx);
+        }
+        return v.imageIndex === idx;
+      });
       if (matchingVariant) {
         setSelectedColor(matchingVariant.colorName);
         const nextValidSizes = matchingVariant.sizes ? Object.keys(matchingVariant.sizes) : [];
@@ -246,6 +253,32 @@ export default function ProductQuickView({
     .filter(p => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
+  const displayImages = React.useMemo(() => {
+    if (!product) return [];
+    if (selectedColor && product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
+        return variant.imageIndices
+          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
+          .filter(item => item.url);
+      }
+      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
+      }
+    }
+    // Fallback: show all images
+    return product.images.map((img, idx) => ({ url: img, originalIdx: idx }));
+  }, [product, selectedColor]);
+
+  useEffect(() => {
+    if (displayImages && displayImages.length > 0) {
+      const isCurrentIdxValid = displayImages.some(imgItem => imgItem.originalIdx === activeImageIdx);
+      if (!isCurrentIdxValid) {
+        setActiveImageIdx(displayImages[0].originalIdx);
+      }
+    }
+  }, [displayImages, activeImageIdx]);
+
   const handleAddToCart = () => {
     const cartItem = {
       ...product,
@@ -265,26 +298,26 @@ export default function ProductQuickView({
         <button className="modal-close-btn" onClick={onClose} aria-label="Close details">
           <X size={24} />
         </button>
-
+ 
         <div className="modal-body-grid">
           {/* Column 1: Images */}
           <div className="modal-images-col">
             <div className="modal-main-image">
               <img 
-                src={product.images[activeImageIdx]} 
+                src={product.images[activeImageIdx] || (displayImages[0] ? displayImages[0].url : product.images[0])} 
                 alt={product.name} 
               />
             </div>
             
-            {product.images.length > 1 && (
+            {displayImages.length > 1 && (
               <div className="modal-thumbnails">
-                {product.images.map((img, idx) => (
+                {displayImages.map((imgItem, idx) => (
                   <button
                     key={idx}
-                    className={`thumbnail-btn ${activeImageIdx === idx ? 'active' : ''}`}
-                    onClick={() => handleImageChange(idx)}
+                    className={`thumbnail-btn ${activeImageIdx === imgItem.originalIdx ? 'active' : ''}`}
+                    onClick={() => handleImageChange(imgItem.originalIdx)}
                   >
-                    <img src={img} alt={`Thumbnail ${idx}`} />
+                    <img src={imgItem.url} alt={`Thumbnail ${idx}`} />
                   </button>
                 ))}
               </div>

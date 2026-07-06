@@ -106,6 +106,56 @@ function ProductDetailsPageWrapper({
   );
 }
 
+// Dedicated Limited Period Offers page
+function OffersView({
+  products,
+  isProductWishlisted,
+  handleWishlistToggle,
+  handleCardAddToCart,
+  handleNavigate
+}) {
+  return (
+    <div className="page-home animate-fade">
+      <section className="section limited-products-section bg-secondary" style={{ paddingTop: '120px', minHeight: '60vh' }}>
+        <div className="container">
+          <div className="section-header">
+            <span className="section-subtitle">Flash Deals</span>
+            <h2 className="section-title">Limited Period Offers</h2>
+            <p className="section-description">
+              Hurry up! Grab these premium pieces on special discount before the offer expires.
+            </p>
+          </div>
+
+          {products.filter(p => p.limitedOffer === true || p.isLimited === true).length === 0 ? (
+            <div className="text-center" style={{ padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: '1.1rem' }}>No limited period offers available right now. Check back soon!</p>
+              <button className="btn btn-primary" style={{ marginTop: '20px' }} onClick={() => handleNavigate('shop')}>
+                Browse All Products
+              </button>
+            </div>
+          ) : (
+            <div className="product-grid">
+              {products
+                .filter(p => p.limitedOffer === true || p.isLimited === true)
+                .map(product => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    isWishlisted={isProductWishlisted(product)}
+                    onWishlistToggle={handleWishlistToggle}
+                    onAddToCart={handleCardAddToCart}
+                    onNavigate={handleNavigate}
+                  />
+                ))
+              }
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function HomeView({
   products,
   isProductWishlisted,
@@ -118,95 +168,41 @@ function HomeView({
   return (
     <div className="page-home animate-fade">
       <Hero onNavigate={handleNavigate} categories={categories} heroSlides={heroSlides} />
+
+      {/* Shop By Category Section */}
       <CategorySection onNavigate={handleNavigate} categories={categories} />
       
-      {/* Featured Grid Section */}
+      {/* All Products Section */}
       <section className="section featured-products-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-subtitle">Exquisite Handpicks</span>
-            <h2 className="section-title">Featured Products</h2>
+            <span className="section-subtitle">Exquisite Collections</span>
+            <h2 className="section-title">All Products</h2>
             <p className="section-description">
-              Explore our top selling statements designed to elevate your silhouette and bring luxurious style to light.
+              Explore our complete catalog of premium fashion silhouettes designed to elevate your style.
             </p>
           </div>
 
           <div className="product-grid">
-            {products
-              .filter(p => p.featured === true || p.isFeatured === true)
-              .slice(0, 4)
-              .map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isWishlisted={isProductWishlisted(product)}
-                  onWishlistToggle={handleWishlistToggle}
-                  onAddToCart={handleCardAddToCart}
-                  onNavigate={handleNavigate}
-                />
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      {/* Limited Time Offer Section */}
-      <section className="section limited-products-section bg-secondary">
-        <div className="container">
-          <div className="section-header">
-            <span className="section-subtitle">Flash Deals</span>
-            <h2 className="section-title">Limited Time Offers</h2>
-            <p className="section-description">
-              Hurry up! Grab these premium pieces on special discount before the offer expires.
-            </p>
+            {products.slice(0, 8).map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isWishlisted={isProductWishlisted(product)}
+                onWishlistToggle={handleWishlistToggle}
+                onAddToCart={handleCardAddToCart}
+                onNavigate={handleNavigate}
+              />
+            ))}
           </div>
 
-          <div className="product-grid">
-            {products
-              .filter(p => p.limitedOffer === true || p.isLimited === true)
-              .slice(0, 4)
-              .map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isWishlisted={isProductWishlisted(product)}
-                  onWishlistToggle={handleWishlistToggle}
-                  onAddToCart={handleCardAddToCart}
-                  onNavigate={handleNavigate}
-                />
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      {/* New Arrivals Section */}
-      <section className="section new-arrivals-section">
-        <div className="container">
-          <div className="section-header">
-            <span className="section-subtitle">Fresh Drops</span>
-            <h2 className="section-title">New Arrivals</h2>
-            <p className="section-description">
-              Stay ahead of the curve. Discover our newest drapes, loungewear sets, and premium accessories fresh off the runway.
-            </p>
-          </div>
-
-          <div className="product-grid">
-            {products
-              .filter(p => p.isNew)
-              .slice(0, 4)
-              .map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  isWishlisted={isProductWishlisted(product)}
-                  onWishlistToggle={handleWishlistToggle}
-                  onAddToCart={handleCardAddToCart}
-                  onNavigate={handleNavigate}
-                />
-              ))
-            }
-          </div>
+          {products.length > 8 && (
+            <div className="text-center" style={{ marginTop: '32px' }}>
+              <button className="btn btn-primary" onClick={() => handleNavigate('shop')}>
+                View All Products
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -315,6 +311,8 @@ export default function App() {
       navigate('/login');
     } else if (page === 'about') {
       navigate('/about');
+    } else if (page === 'offers') {
+      navigate('/offers');
     } else if (page === 'privacy-policy') {
       navigate('/privacy-policy');
     } else if (page === 'terms-conditions') {
@@ -351,6 +349,7 @@ export default function App() {
     if (path.startsWith('/category/')) return 'category';
     if (path.startsWith('/product/')) return 'product';
     if (path === '/about') return 'about';
+    if (path === '/offers') return 'offers';
     if (path === '/privacy-policy') return 'privacy-policy';
     if (path === '/terms-conditions') return 'terms-conditions';
     if (path === '/refund-policy') return 'refund-policy';
@@ -1459,6 +1458,16 @@ The orders for the user are shipped through registered domestic courier companie
 
           <Route path="/firebase-test" element={
             <FirebaseTestPage onNavigate={handleNavigate} />
+          } />
+
+          <Route path="/offers" element={
+            <OffersView
+              products={products}
+              isProductWishlisted={isProductWishlisted}
+              handleWishlistToggle={handleWishlistToggle}
+              handleCardAddToCart={handleCardAddToCart}
+              handleNavigate={handleNavigate}
+            />
           } />
 
           <Route path="/admin" element={
