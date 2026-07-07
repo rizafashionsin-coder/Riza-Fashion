@@ -274,6 +274,34 @@ export default function ProductDetailsPage({
     }
   }, [products, product]);
 
+  // Display images for the selected color variant — must be declared here (before any early returns)
+  const displayImages = useMemo(() => {
+    if (!product) return [];
+    if (selectedColor && product.variants && Array.isArray(product.variants)) {
+      const variant = product.variants.find(v => v.colorName === selectedColor);
+      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
+        return variant.imageIndices
+          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
+          .filter(item => item.url);
+      }
+      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
+        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
+      }
+    }
+    // Fallback: show all images
+    return (product.images || []).map((img, idx) => ({ url: img, originalIdx: idx }));
+  }, [product, selectedColor]);
+
+  // Keep selectedImageIdx in sync when displayImages changes
+  useEffect(() => {
+    if (displayImages && displayImages.length > 0) {
+      const isCurrentIdxValid = displayImages.some(imgItem => imgItem.originalIdx === selectedImageIdx);
+      if (!isCurrentIdxValid) {
+        setSelectedImageIdx(displayImages[0].originalIdx);
+      }
+    }
+  }, [displayImages, selectedImageIdx]);
+
   if (loadingProduct) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -360,31 +388,7 @@ export default function ProductDetailsPage({
     setReviewSubmitted(true);
   };
 
-  const displayImages = useMemo(() => {
-    if (!product) return [];
-    if (selectedColor && product.variants && Array.isArray(product.variants)) {
-      const variant = product.variants.find(v => v.colorName === selectedColor);
-      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
-        return variant.imageIndices
-          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
-          .filter(item => item.url);
-      }
-      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
-        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
-      }
-    }
-    // Fallback: show all images
-    return product.images.map((img, idx) => ({ url: img, originalIdx: idx }));
-  }, [product, selectedColor]);
-
-  useEffect(() => {
-    if (displayImages && displayImages.length > 0) {
-      const isCurrentIdxValid = displayImages.some(imgItem => imgItem.originalIdx === selectedImageIdx);
-      if (!isCurrentIdxValid) {
-        setSelectedImageIdx(displayImages[0].originalIdx);
-      }
-    }
-  }, [displayImages, selectedImageIdx]);
+  // (displayImages and its useEffect moved above early returns — see top of hooks section)
 
   const isWishlisted = wishlist.some(item => item.id === product.id);
   const primaryImage = product.images[selectedImageIdx] || product.images[0];
