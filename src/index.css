@@ -5412,6 +5412,11 @@ textarea.form-input {
   padding: 16px 20px;
 }
 
+.meta-secondary-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .details-wishlist-toggle-btn {
   width: 54px;
   height: 54px;
@@ -5429,6 +5434,54 @@ textarea.form-input {
   border-color: var(--primary);
   color: var(--primary);
   background-color: var(--primary-light);
+}
+
+.details-share-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-primary);
+  color: var(--text-light);
+  transition: var(--transition-fast);
+  position: relative;
+}
+
+.details-share-btn:hover, .details-share-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.share-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  background-color: var(--charcoal);
+  color: var(--secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.share-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--charcoal);
 }
 
 .meta-specifications-box {
@@ -6166,8 +6219,16 @@ textarea.form-input {
     width: 100%;
   }
   
-  .details-wishlist-toggle-btn {
+  .meta-secondary-actions {
+    display: flex;
     width: 100%;
+    gap: 12px;
+  }
+
+  .details-wishlist-toggle-btn, .details-share-btn {
+    flex: 1;
+    width: auto;
+    height: 50px;
   }
   
   .reviews-layout-grid {

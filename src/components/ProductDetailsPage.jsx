@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Star, Heart, ShoppingBag, Plus, Minus, ChevronRight, MessageSquare, AlertCircle } from 'lucide-react';
+import { Star, Heart, ShoppingBag, Plus, Minus, ChevronRight, MessageSquare, AlertCircle, Share2 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -45,6 +45,7 @@ export default function ProductDetailsPage({
   const [quantity, setQuantity] = useState(1);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isZooming, setIsZooming] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
 
   // Review Form state
   const [reviewRating, setReviewRating] = useState(5);
@@ -324,6 +325,32 @@ export default function ProductDetailsPage({
     onWishlistToggle(product);
   };
 
+  const handleShareClick = async () => {
+    const shareData = {
+      title: product.name,
+      text: `Check out this premium piece from Riza Fashions: ${product.name}`,
+      url: window.location.href
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error("Error sharing:", err);
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setShareSuccess(true);
+        setTimeout(() => setShareSuccess(false), 2000);
+      } catch (err) {
+        console.error("Clipboard copy failed:", err);
+      }
+    }
+  };
+
   const handleAddToCartClick = () => {
     onAddToCart({
       ...product,
@@ -588,13 +615,24 @@ export default function ProductDetailsPage({
                 <span>Buy Now</span>
               </button>
               
-              <button 
-                className={`details-wishlist-toggle-btn ${isWishlisted ? 'active' : ''}`}
-                onClick={handleWishlistClick}
-                aria-label={isWishlisted ? "Remove from closet" : "Save in closet"}
-              >
-                <Heart size={20} fill={isWishlisted ? "var(--primary)" : "none"} />
-              </button>
+              <div className="meta-secondary-actions">
+                <button 
+                  className={`details-wishlist-toggle-btn ${isWishlisted ? 'active' : ''}`}
+                  onClick={handleWishlistClick}
+                  aria-label={isWishlisted ? "Remove from closet" : "Save in closet"}
+                >
+                  <Heart size={20} fill={isWishlisted ? "var(--primary)" : "none"} />
+                </button>
+
+                <button 
+                  className="details-share-btn"
+                  onClick={handleShareClick}
+                  aria-label="Share product"
+                >
+                  <Share2 size={20} />
+                  {shareSuccess && <span className="share-tooltip">Link Copied!</span>}
+                </button>
+              </div>
             </div>
 
             {/* Assurances highlights */}
