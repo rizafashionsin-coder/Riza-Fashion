@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const bubbleCoordinates = [
   { top: '15%', left: '-5%' },  // Index 0: Sarees (top-left)
@@ -271,7 +272,7 @@ export default function Hero({ onNavigate, categories, heroSlides }) {
             {slides.map((slide, idx) => (
               <img
                 key={slide.id || idx}
-                src={slide.image}
+                src={getOptimizedImageUrl(slide.image, 1200)}
                 alt={slide.title || 'Slide Image'}
                 className={`showcase-model-img ${activeIndexBounded === idx ? 'visible' : ''}`}
                 loading="eager"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShoppingBag, Plus, Minus, Trash2, Tag, ArrowRight, Check } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function CartDrawer({
   isOpen,
@@ -115,7 +116,7 @@ export default function CartDrawer({
                     
                     {/* Item Image */}
                     <div className="cart-item-img-box">
-                      <img src={itemImage} alt={itemName} />
+                      <img src={getOptimizedImageUrl(itemImage, 100)} alt={itemName} />
                     </div>
 
                     {/* Item Info */}

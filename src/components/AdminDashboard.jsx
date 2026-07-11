@@ -935,16 +935,6 @@ export default function AdminDashboard({ currentUser, onNavigate, categories, de
       setFormError("Please enter a color name.");
       return;
     }
-    const nameExists = prodVariants.some(v => v.colorName.toLowerCase() === name.toLowerCase());
-    const codeExists = prodVariants.some(v => v.colorCode.toLowerCase() === code.toLowerCase());
-    if (nameExists) {
-      setFormError(`The color name "${name}" has already been added.`);
-      return;
-    }
-    if (codeExists) {
-      setFormError(`The color code "${code}" has already been added.`);
-      return;
-    }
     setProdVariants(prev => [...prev, { 
       colorName: name,
       colorCode: code,

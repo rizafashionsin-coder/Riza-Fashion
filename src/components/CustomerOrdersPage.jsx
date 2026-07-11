@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Calendar, Package, Truck, CheckCircle, Clock, ArrowLeft, ChevronRight, ChevronDown, HelpCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function CustomerOrdersPage({ currentUser, onNavigate }) {
   const [orders, setOrders] = useState([]);
@@ -278,7 +279,7 @@ export default function CustomerOrdersPage({ currentUser, onNavigate }) {
                           {order.items && order.items.map((item, idx) => (
                             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
                               <img 
-                                src={item.images ? item.images[0] : ''} 
+                                src={getOptimizedImageUrl(item.images ? item.images[0] : '', 100)} 
                                 alt="" 
                                 style={{ width: '48px', height: '60px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-light)' }} 
                               />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function CategorySection({ onNavigate, categories }) {
   const displayCategories = categories ? categories.filter(cat => cat.active !== false) : [];
@@ -25,7 +26,7 @@ export default function CategorySection({ onNavigate, categories }) {
               <div className="category-round-image-wrapper">
                 <img 
                   className="category-round-img"
-                  src={category.image} 
+                  src={getOptimizedImageUrl(category.image, 200)} 
                   alt={category.name} 
                   loading="lazy"
                 />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Star, Heart, ShoppingBag, Plus, Minus, Send, Check } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function ProductQuickView({
   product,
@@ -253,22 +254,11 @@ export default function ProductQuickView({
     .filter(p => p.category === product.category && p.id !== product.id)
     .slice(0, 3);
 
+  // Display all product images in the gallery so users can see all options and click any image to swap colors
   const displayImages = React.useMemo(() => {
     if (!product) return [];
-    if (selectedColor && product.variants && Array.isArray(product.variants)) {
-      const variant = product.variants.find(v => v.colorName === selectedColor);
-      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
-        return variant.imageIndices
-          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
-          .filter(item => item.url);
-      }
-      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
-        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
-      }
-    }
-    // Fallback: show all images
-    return product.images.map((img, idx) => ({ url: img, originalIdx: idx }));
-  }, [product, selectedColor]);
+    return (product.images || []).map((img, idx) => ({ url: img, originalIdx: idx }));
+  }, [product]);
 
   useEffect(() => {
     if (displayImages && displayImages.length > 0) {
@@ -304,7 +294,7 @@ export default function ProductQuickView({
           <div className="modal-images-col">
             <div className="modal-main-image">
               <img 
-                src={product.images[activeImageIdx] || (displayImages[0] ? displayImages[0].url : product.images[0])} 
+                src={getOptimizedImageUrl(product.images[activeImageIdx] || (displayImages[0] ? displayImages[0].url : product.images[0]), 800)} 
                 alt={product.name} 
               />
             </div>
@@ -317,7 +307,7 @@ export default function ProductQuickView({
                     className={`thumbnail-btn ${activeImageIdx === imgItem.originalIdx ? 'active' : ''}`}
                     onClick={() => handleImageChange(imgItem.originalIdx)}
                   >
-                    <img src={imgItem.url} alt={`Thumbnail ${idx}`} />
+                    <img src={getOptimizedImageUrl(imgItem.url, 150)} alt={`Thumbnail ${idx}`} />
                   </button>
                 ))}
               </div>
@@ -623,7 +613,7 @@ export default function ProductQuickView({
                   onClick={() => onQuickView(relProduct)}
                 >
                   <div className="related-img-box">
-                    <img src={relProduct.images[0]} alt={relProduct.name} />
+                    <img src={getOptimizedImageUrl(relProduct.images[0], 250)} alt={relProduct.name} />
                   </div>
                   <div className="related-info">
                     <h4 className="related-name">{relProduct.name}</h4>

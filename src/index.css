@@ -6651,4 +6651,31 @@ textarea.form-input {
   border-radius: 6px;
 }
 
+/* Pricing Typography - Formal Font Style */
+.current-price,
+.original-price,
+.details-current-price,
+.details-original-price,
+.sticky-price,
+.related-price,
+.item-price,
+.sidebar-item-price,
+.item-qty-price,
+.cart-unit-price,
+.cart-unit-original-price,
+.checkout-item-total-price,
+.checkout-item-price,
+.item-price-cell,
+.cart-item-price-row,
+.cart-line-total,
+.total-row,
+.total-row span,
+.total-row strong,
+.tracker-total-row strong,
+.tracker-total-row span,
+.sidebar-pricing-row span,
+.sidebar-pricing-row strong {
+  font-family: var(--font-headings) !important;
+}
+
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { CreditCard, ShieldCheck, ShoppingBag, ChevronRight, Tag } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, increment } from 'firebase/firestore';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function CheckoutPage({
   cart,
@@ -460,7 +461,7 @@ export default function CheckoutPage({
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: '#FFF', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
                       <input type="checkbox" checked disabled style={{ accentColor: 'var(--primary)', cursor: 'not-allowed', width: '18px', height: '18px' }} />
-                      <img src={itemImage} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <img src={getOptimizedImageUrl(itemImage, 100)} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
                       <div style={{ flex: 1, textAlign: 'left' }}>
                         <strong style={{ fontSize: '0.9rem', display: 'block' }}>{itemName}</strong>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -513,7 +514,7 @@ export default function CheckoutPage({
                             onChange={() => toggleOptionalItem(itemKey)} 
                             style={{ accentColor: 'var(--primary)', width: '18px', height: '18px', cursor: 'pointer' }}
                           />
-                          <img src={itemImage} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
+                          <img src={getOptimizedImageUrl(itemImage, 100)} alt="" style={{ width: '40px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
                           <div style={{ flex: 1, textAlign: 'left' }}>
                             <strong style={{ fontSize: '0.9rem', display: 'block', color: 'var(--charcoal)' }}>{itemName}</strong>
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -738,7 +739,7 @@ export default function CheckoutPage({
                 return (
                   <div key={idx} className="checkout-item-summary-row">
                     <div className="checkout-item-image">
-                      <img src={itemImage} alt={itemName} />
+                      <img src={getOptimizedImageUrl(itemImage, 100)} alt={itemName} />
                       <span className="item-qty-badge">{item.quantity}</span>
                     </div>
                     <div className="checkout-item-details">

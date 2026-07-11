@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function ProductCard({
   product,
@@ -48,7 +49,7 @@ export default function ProductCard({
         </button>
 
         <div className="product-image-box">
-          <img src={primaryImage} alt={name} className="product-img-primary" loading="lazy" />
+          <img src={getOptimizedImageUrl(primaryImage, 400)} alt={name} className="product-img-primary" loading="lazy" />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, ShoppingBag, Plus, Minus, Tag, ChevronRight } from 'lucide-react';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function CartPage({
   cart,
@@ -112,7 +113,7 @@ export default function CartPage({
                     {/* Visual details */}
                     <div className="item-info-cell">
                       <div className="cart-item-visual">
-                        <img src={itemImage} alt={itemName} />
+                        <img src={getOptimizedImageUrl(itemImage, 150)} alt={itemName} />
                       </div>
                       <div className="cart-item-meta">
                         <h3 className="cart-item-name" onClick={() => onNavigate('product', null, false, false, item.id)}>

@@ -3,6 +3,7 @@ import { Star, Heart, ShoppingBag, Plus, Minus, ChevronRight, MessageSquare, Ale
 import ProductCard from './ProductCard';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 export default function ProductDetailsPage({
   productId,
@@ -274,23 +275,11 @@ export default function ProductDetailsPage({
     }
   }, [products, product]);
 
-  // Display images for the selected color variant — must be declared here (before any early returns)
+  // Display all product images in the gallery so users can see all options and click any image to swap colors
   const displayImages = useMemo(() => {
     if (!product) return [];
-    if (selectedColor && product.variants && Array.isArray(product.variants)) {
-      const variant = product.variants.find(v => v.colorName === selectedColor);
-      if (variant && variant.imageIndices && Array.isArray(variant.imageIndices) && variant.imageIndices.length > 0) {
-        return variant.imageIndices
-          .map(idx => ({ url: product.images[idx], originalIdx: idx }))
-          .filter(item => item.url);
-      }
-      if (variant && variant.imageIndex !== undefined && variant.imageIndex !== -1 && product.images[variant.imageIndex]) {
-        return [{ url: product.images[variant.imageIndex], originalIdx: variant.imageIndex }];
-      }
-    }
-    // Fallback: show all images
     return (product.images || []).map((img, idx) => ({ url: img, originalIdx: idx }));
-  }, [product, selectedColor]);
+  }, [product]);
 
   // Keep selectedImageIdx in sync when displayImages changes
   useEffect(() => {
@@ -419,7 +408,7 @@ export default function ProductDetailsPage({
                   className={`gallery-thumb-btn ${selectedImageIdx === imgItem.originalIdx ? 'active' : ''}`}
                   onClick={() => handleImageChange(imgItem.originalIdx)}
                 >
-                  <img src={imgItem.url} alt={`${product.name} View ${index + 1}`} />
+                  <img src={getOptimizedImageUrl(imgItem.url, 150)} alt={`${product.name} View ${index + 1}`} />
                 </button>
               ))}
             </div>
@@ -432,7 +421,7 @@ export default function ProductDetailsPage({
               onMouseMove={handleMouseMove}
             >
               <img 
-                src={primaryImage} 
+                src={getOptimizedImageUrl(primaryImage, 800)} 
                 alt={product.name} 
                 className="main-gallery-img"
                 style={{
