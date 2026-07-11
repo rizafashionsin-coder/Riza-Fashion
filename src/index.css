@@ -6739,4 +6739,29 @@ textarea.form-input {
   font-family: var(--font-headings) !important;
 }
 
+/* Layout and Spacing Improvements for Mobile viewports */
+@media (max-width: 1024px) {
+  .main-viewport-content {
+    padding-bottom: calc(var(--mobile-nav-height) + 24px);
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-editorial-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+  
+  .hero-editorial-actions .btn {
+    width: 100%;
+  }
+
+  .product-gallery-main {
+    height: auto !important;
+    aspect-ratio: 3 / 4;
+    max-height: 50vh;
+  }
+}
+
 

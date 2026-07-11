@@ -326,6 +326,16 @@ export default function ProductDetailsPage({
   };
 
   const handleShareClick = async () => {
+    // 1. Copy link to clipboard for instant success feedback
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 2000);
+    } catch (err) {
+      console.error("Clipboard copy failed:", err);
+    }
+
+    // 2. Also trigger native sharing overlay if supported
     const shareData = {
       title: product.name,
       text: `Check out this premium piece from Riza Fashions: ${product.name}`,
@@ -339,14 +349,6 @@ export default function ProductDetailsPage({
         if (err.name !== 'AbortError') {
           console.error("Error sharing:", err);
         }
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        setShareSuccess(true);
-        setTimeout(() => setShareSuccess(false), 2000);
-      } catch (err) {
-        console.error("Clipboard copy failed:", err);
       }
     }
   };
@@ -435,7 +437,11 @@ export default function ProductDetailsPage({
                   className={`gallery-thumb-btn ${selectedImageIdx === imgItem.originalIdx ? 'active' : ''}`}
                   onClick={() => handleImageChange(imgItem.originalIdx)}
                 >
-                  <img src={getOptimizedImageUrl(imgItem.url, 150)} alt={`${product.name} View ${index + 1}`} />
+                  <img 
+                    src={getOptimizedImageUrl(imgItem.url, 150)} 
+                    alt={`${product.name} View ${index + 1}`} 
+                    loading="lazy" 
+                  />
                 </button>
               ))}
             </div>
@@ -451,6 +457,8 @@ export default function ProductDetailsPage({
                 src={getOptimizedImageUrl(primaryImage, 800)} 
                 alt={product.name} 
                 className="main-gallery-img"
+                loading="eager"
+                fetchPriority="high"
                 style={{
                   transformOrigin: `${mousePos.x}% ${mousePos.y}%`,
                   transform: isZooming ? 'scale(1.5)' : 'scale(1)'
