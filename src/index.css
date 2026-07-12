@@ -26,6 +26,7 @@
   /* Typography */
   --font-headings: 'Playfair Display', Georgia, serif;
   --font-body: 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-price: 'Outfit', 'Rajdhani', sans-serif;
   
   /* Borders */
   --radius-sm: 6px;
@@ -6764,4 +6765,14 @@ textarea.form-input {
   }
 }
 
+
+
+/* Global Pricing Typography styling */
+.current-price, .original-price, .details-current-price, .details-original-price, .cart-unit-price, .cart-unit-original-price, .cart-line-total, .checkout-item-total-price, .sidebar-item-price, .meta-current-price, .meta-original-price, .sticky-price, .related-price {
+  font-family: var(--font-price) !important;
+  letter-spacing: 0.5px;
+}
+.current-price, .details-current-price, .cart-unit-price, .cart-line-total, .checkout-item-total-price, .sidebar-item-price, .meta-current-price, .sticky-price, .related-price {
+  font-weight: 700 !important;
+}
 
