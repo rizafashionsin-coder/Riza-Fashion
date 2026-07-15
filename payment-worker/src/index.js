@@ -125,6 +125,107 @@ export default {
         });
       }
 
+      // Endpoint 3: Track Purchase (Conversions API)
+      if (url.pathname === '/api/track-purchase' && request.method === 'POST') {
+        const body = await request.json();
+        const { transactionId, email, phone, value, currency, userAgent, items, eventSourceUrl } = body;
+
+        if (!transactionId || value === undefined || value === null) {
+          return errorResponse("Missing required parameters: transactionId, value", 400, corsHeaders);
+        }
+
+        // Verify status with PhonePe first to ensure it's a valid paid order
+        const token = await getAccessToken(env);
+        const statusUrl = env.PHONEPE_ENV === 'production'
+          ? `https://api.phonepe.com/apis/pg/checkout/v2/order/${transactionId}/status`
+          : `https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/order/${transactionId}/status`;
+
+        console.log(`Verifying payment for CAPI Txn ${transactionId} via ${statusUrl}`);
+        const statusRes = await fetch(statusUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `O-Bearer ${token}`
+          }
+        });
+
+        const statusData = await statusRes.json();
+        if (statusData.state !== "COMPLETED") {
+          return errorResponse("Transaction is not completed. Cannot track purchase.", 400, corsHeaders);
+        }
+
+        // If verified, proceed to send to Meta Graph API
+        const pixelId = env.META_PIXEL_ID || '2555168881599911';
+        const accessToken = env.META_ACCESS_TOKEN;
+
+        if (!accessToken) {
+          console.warn("META_ACCESS_TOKEN is not set in Worker environment. Skipping Conversions API call.");
+          return new Response(JSON.stringify({
+            success: false,
+            message: "META_ACCESS_TOKEN is not configured"
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Hash user details as required by Meta (SHA-256)
+        const hashedEmail = email ? await sha256(email) : null;
+        const hashedPhone = phone ? await sha256(phone) : null;
+
+        const clientIp = request.headers.get('CF-Connecting-IP') || '';
+
+        const capiPayload = {
+          data: [
+            {
+              event_name: "Purchase",
+              event_time: Math.floor(Date.now() / 1000),
+              event_id: transactionId,
+              user_data: {
+                client_ip_address: clientIp,
+                client_user_agent: userAgent || '',
+                em: hashedEmail ? [hashedEmail] : [],
+                ph: hashedPhone ? [hashedPhone] : []
+              },
+              custom_data: {
+                currency: currency || 'INR',
+                value: Number(value),
+                content_type: 'product',
+                contents: (items || []).map(item => ({
+                  id: item.id,
+                  quantity: Number(item.quantity || 1),
+                  item_price: Number(item.salePrice || item.price || 0)
+                }))
+              },
+              event_source_url: eventSourceUrl || 'https://rizafashions.in/',
+              action_source: "website"
+            }
+          ]
+        };
+
+        const metaUrl = `https://graph.facebook.com/v20.0/${pixelId}/events?access_token=${accessToken}`;
+        
+        console.log(`Sending CAPI event for Txn ${transactionId} to Meta`);
+        const metaRes = await fetch(metaUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(capiPayload)
+        });
+
+        const metaData = await metaRes.json();
+        console.log("Meta CAPI response:", metaData);
+
+        return new Response(JSON.stringify({
+          success: metaRes.ok,
+          metaResponse: metaData
+        }), {
+          status: metaRes.ok ? 200 : 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       // Route fallback: Not found
       return errorResponse("Not Found", 404, corsHeaders);
 
@@ -217,4 +318,13 @@ function errorResponse(message, statusCode, corsHeaders) {
     status: statusCode,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
+}
+
+// SHA-256 hashing helper using Web Crypto API
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message.trim().toLowerCase());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
 }

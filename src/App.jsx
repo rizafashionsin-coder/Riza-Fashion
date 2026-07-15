@@ -856,12 +856,23 @@ The orders for the user are shipped through registered domestic courier companie
         
         try {
           const workerUrl = import.meta.env.VITE_PHONEPE_WORKER_URL || 'https://riza-payment-worker.rizafashions-in.workers.dev';
-          const res = await fetch(`${workerUrl}/api/status/${transactionId}`);
-          const data = await res.json();
+          let isSuccess = false;
+          let paymentData = null;
           
-          console.log("PhonePe verification status response:", data);
+          try {
+            const res = await fetch(`${workerUrl}/api/status/${transactionId}`);
+            paymentData = await res.json();
+            console.log("PhonePe verification status response:", paymentData);
+            
+            if (paymentData && paymentData.success && paymentData.code === 'PAYMENT_SUCCESS') {
+              isSuccess = true;
+            }
+          } catch (fetchErr) {
+            console.error("Error fetching PhonePe status:", fetchErr);
+            isSuccess = false;
+          }
           
-          if (data && data.success && data.code === 'PAYMENT_SUCCESS') {
+          if (isSuccess) {
             // Payment succeeded!
             // Update order status in firestore
             const orderRef = doc(db, 'orders', transactionId);
@@ -885,6 +896,57 @@ The orders for the user are shipped through registered domestic courier companie
                   console.error("Failed to increment coupon usedCount:", couponErr);
                 }
               }
+
+              // Trigger Meta Pixel Purchase event
+              if (window.fbq) {
+                try {
+                  const purchaseValue = Number(orderData.finalAmount || orderData.totalAmount || 0);
+                  const purchaseItems = orderData.items || [];
+                  window.fbq('track', 'Purchase', {
+                    value: purchaseValue,
+                    currency: 'INR',
+                    content_ids: purchaseItems.map(item => item.id),
+                    content_type: 'product',
+                    contents: purchaseItems.map(item => ({
+                      id: item.id,
+                      quantity: item.quantity
+                    }))
+                  }, {
+                    eventID: transactionId
+                  });
+                  console.log("Meta Pixel Purchase event tracked successfully for amount:", purchaseValue);
+                } catch (pixelErr) {
+                  console.error("Failed to send Meta Pixel Purchase event:", pixelErr);
+                }
+              }
+
+              // Trigger Meta Conversions API (CAPI) Purchase event
+              try {
+                const userAgent = navigator.userAgent;
+                const purchaseValue = Number(orderData.finalAmount || orderData.totalAmount || 0);
+                const purchaseItems = orderData.items || [];
+                
+                fetch(`${workerUrl}/api/track-purchase`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    transactionId: transactionId,
+                    email: orderData.email || currentUser?.email || '',
+                    phone: orderData.phone || '',
+                    value: purchaseValue,
+                    currency: 'INR',
+                    userAgent: userAgent,
+                    items: purchaseItems,
+                    eventSourceUrl: window.location.href
+                  })
+                }).then(res => res.json())
+                  .then(data => console.log("Meta CAPI tracking response:", data))
+                  .catch(capiErr => console.error("Error sending Meta CAPI track request:", capiErr));
+              } catch (capiOuterErr) {
+                console.error("Error initiating Meta CAPI tracking:", capiOuterErr);
+              }
             }
 
             // Clear the cart
@@ -896,20 +958,20 @@ The orders for the user are shipped through registered domestic courier companie
               console.error(err);
             }
             
-            alert(`Payment of ₹${data.data.amount / 100} was successful! Your order has been placed.`);
+            alert(`Payment of ₹${(paymentData?.data?.amount || 0) / 100} was successful! Your order has been placed.`);
           } else {
-            // Payment failed
+            // Payment failed or was cancelled
             const orderRef = doc(db, 'orders', transactionId);
             await updateDoc(orderRef, {
               paymentStatus: 'Failed',
               orderStatus: 'Cancelled'
             });
             
-            alert(`Payment verification failed: ${data.message || 'Transaction was not successful'}.`);
+            alert(`Payment verification failed or was cancelled.`);
           }
         } catch (error) {
           console.error("Error verifying PhonePe payment:", error);
-          alert("Error verifying your payment status. Please contact support if amount was deducted.");
+          alert("Error processing your order status. Please contact support.");
         } finally {
           setIsLoading(false);
           // Clean the query parameters from URL
